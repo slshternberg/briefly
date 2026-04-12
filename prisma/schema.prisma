@@ -1,0 +1,388 @@
+// ============================================================================
+// Briefly — Prisma Schema (v2, reviewed)
+// Multi-tenant SaaS for AI-powered meeting summaries
+// ============================================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================================
+// ENUMS
+// ============================================================================
+
+enum WorkspaceMemberRole {
+  OWNER
+  ADMIN
+  MEMBER
+}
+
+enum SubscriptionStatus {
+  TRIALING
+  ACTIVE
+  PAST_DUE
+  CANCELED
+  UNPAID
+}
+
+enum ConversationStatus {
+  DRAFT
+  UPLOADED
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+enum AssetSourceType {
+  RECORDED
+  UPLOADED
+}
+
+enum AssetUploadStatus {
+  PENDING
+  UPLOADING
+  COMPLETED
+  FAILED
+}
+
+enum ChatMessageRole {
+  USER
+  ASSISTANT
+}
+
+// ============================================================================
+// IDENTITY & TENANCY
+// ============================================================================
+
+model User {
+  id            String   @id @default(uuid()) @db.Uuid
+  email         String   @unique
+  name          String?
+  avatarUrl     String?
+  passwordHash  String?
+  emailVerified Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  memberships   WorkspaceMember[]
+  conversations Conversation[]
+  chatMessages  ChatMessage[]
+  auditLogs     AuditLog[]
+  styleExamples StyleExample[]
+
+  @@map("users")
+}
+
+model Workspace {
+  id               String    @id @default(uuid()) @db.Uuid
+  name             String
+  slug             String    @unique
+  stripeCustomerId String?   @unique
+  defaultLanguage      String    @default("Hebrew")
+  customInstructions   String?
+  analysisInstructions String?
+  emailInstructions    String?
+  activeStyleProfileId String?   @db.Uuid
+  createdAt            DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  deletedAt        DateTime?
+
+  members       WorkspaceMember[]
+  subscriptions Subscription[]
+  usageRecords  UsageRecord[]
+  conversations Conversation[]
+  assets        ConversationAsset[]
+  summaries     ConversationSummary[]
+  threads       ChatThread[]
+  messages      ChatMessage[]
+  auditLogs     AuditLog[]
+  apiKeys       ApiKey[]
+  styleExamples StyleExample[]
+  styleProfiles StyleProfile[]
+
+  @@map("workspaces")
+}
+
+model WorkspaceMember {
+  id          String              @id @default(uuid()) @db.Uuid
+  workspaceId String              @db.Uuid
+  userId      String              @db.Uuid
+  role        WorkspaceMemberRole @default(MEMBER)
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@unique([workspaceId, userId])
+  @@index([userId])
+  @@map("workspace_members")
+}
+
+// ============================================================================
+// BILLING & USAGE
+// ============================================================================
+
+model Plan {
+  id                       String   @id @default(uuid()) @db.Uuid
+  name                     String   @unique
+  slug                     String   @unique
+  stripePriceId            String?  @unique
+  priceMonthly             Int      @default(0)
+  maxConversationsPerMonth Int
+  maxAudioMinutesPerMonth  Int
+  maxAiQueriesPerMonth     Int
+  maxStorageMb             Int
+  maxMembersPerWorkspace   Int
+  isActive                 Boolean  @default(true)
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @updatedAt
+
+  subscriptions Subscription[]
+
+  @@map("plans")
+}
+
+model Subscription {
+  id                   String             @id @default(uuid()) @db.Uuid
+  workspaceId          String             @db.Uuid
+  planId               String             @db.Uuid
+  status               SubscriptionStatus @default(ACTIVE)
+  stripeSubscriptionId String?            @unique
+  currentPeriodStart   DateTime?
+  currentPeriodEnd     DateTime?
+  cancelAtPeriodEnd    Boolean            @default(false)
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+  plan      Plan      @relation(fields: [planId], references: [id], onDelete: Restrict)
+
+  @@index([workspaceId, status])
+  @@map("subscriptions")
+}
+
+model UsageRecord {
+  id                 String   @id @default(uuid()) @db.Uuid
+  workspaceId        String   @db.Uuid
+  periodStart        DateTime
+  periodEnd          DateTime
+  conversationCount  Int      @default(0)
+  audioSecondsUsed   Int      @default(0)
+  aiQueryCount       Int      @default(0)
+  storageBytesUsed   BigInt   @default(0)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, periodStart])
+  @@map("usage_records")
+}
+
+// ============================================================================
+// CONVERSATIONS & FILES
+// ============================================================================
+
+model Conversation {
+  id          String             @id @default(uuid()) @db.Uuid
+  workspaceId String             @db.Uuid
+  createdById String             @db.Uuid
+  title       String
+  description String?
+  status      ConversationStatus @default(DRAFT)
+  language    String?            @default("en")
+  durationSec Int?
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+  deletedAt   DateTime?
+
+  workspace Workspace            @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  createdBy User                 @relation(fields: [createdById], references: [id], onDelete: Restrict)
+  assets    ConversationAsset[]
+  summary   ConversationSummary?
+  threads   ChatThread[]
+
+  @@index([workspaceId, createdAt(sort: Desc)])
+  @@index([workspaceId, status])
+  @@index([createdById])
+  @@map("conversations")
+}
+
+model ConversationAsset {
+  id              String            @id @default(uuid()) @db.Uuid
+  workspaceId     String            @db.Uuid
+  conversationId  String            @db.Uuid
+  sourceType      AssetSourceType
+  originalName    String
+  mimeType        String
+  sizeBytes       BigInt
+  durationSeconds Int?
+  storagePath     String
+  uploadStatus    AssetUploadStatus @default(PENDING)
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  workspace    Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId])
+  @@index([conversationId])
+  @@map("conversation_assets")
+}
+
+model ConversationSummary {
+  id             String   @id @default(uuid()) @db.Uuid
+  workspaceId    String   @db.Uuid
+  conversationId String   @unique @db.Uuid
+  rawText        String
+  structuredData Json?
+  modelUsed      String?
+  promptTokens   Int?
+  outputTokens   Int?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  workspace    Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId])
+  @@map("conversation_summaries")
+}
+
+// ============================================================================
+// FOLLOW-UP CHAT
+// ============================================================================
+
+model ChatThread {
+  id             String   @id @default(uuid()) @db.Uuid
+  workspaceId    String   @db.Uuid
+  conversationId String   @db.Uuid
+  title          String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  workspace    Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  conversation Conversation  @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  messages     ChatMessage[]
+
+  @@index([workspaceId])
+  @@index([conversationId])
+  @@map("chat_threads")
+}
+
+model ChatMessage {
+  id           String          @id @default(uuid()) @db.Uuid
+  workspaceId  String          @db.Uuid
+  threadId     String          @db.Uuid
+  role         ChatMessageRole
+  content      String
+  userId       String?         @db.Uuid
+  modelUsed    String?
+  promptTokens Int?
+  outputTokens Int?
+  createdAt    DateTime        @default(now())
+
+  workspace Workspace  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  thread    ChatThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  user      User?      @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([workspaceId])
+  @@index([threadId, createdAt])
+  @@map("chat_messages")
+}
+
+// ============================================================================
+// STYLE LEARNING
+// ============================================================================
+
+enum StyleExampleStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+model StyleExample {
+  id               String             @id @default(uuid()) @db.Uuid
+  workspaceId      String             @db.Uuid
+  title            String
+  audioStoragePath String
+  audioMimeType    String
+  audioSizeBytes   BigInt
+  sentEmailSubject String
+  sentEmailBody    String
+  notes            String?
+  status           StyleExampleStatus @default(PENDING)
+  extractedProfile Json?
+  createdById      String             @db.Uuid
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  createdBy User      @relation(fields: [createdById], references: [id], onDelete: Restrict)
+
+  @@index([workspaceId])
+  @@map("style_examples")
+}
+
+model StyleProfile {
+  id                        String   @id @default(uuid()) @db.Uuid
+  workspaceId               String   @db.Uuid
+  version                   Int      @default(1)
+  profileJson               Json
+  generatedFromExampleCount Int      @default(0)
+  isActive                  Boolean  @default(true)
+  createdAt                 DateTime @default(now())
+  updatedAt                 DateTime @updatedAt
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, isActive])
+  @@map("style_profiles")
+}
+
+// ============================================================================
+// AUDIT & API KEYS
+// ============================================================================
+
+model AuditLog {
+  id          String   @id @default(uuid()) @db.Uuid
+  workspaceId String   @db.Uuid
+  userId      String?  @db.Uuid
+  action      String
+  targetType  String?
+  targetId    String?  @db.Uuid
+  metadata    Json?
+  ipAddress   String?
+  createdAt   DateTime @default(now())
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+  user      User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([workspaceId, createdAt(sort: Desc)])
+  @@index([userId])
+  @@map("audit_logs")
+}
+
+model ApiKey {
+  id          String    @id @default(uuid()) @db.Uuid
+  workspaceId String    @db.Uuid
+  name        String
+  keyHash     String    @unique
+  keyPrefix   String
+  lastUsedAt  DateTime?
+  expiresAt   DateTime?
+  revokedAt   DateTime?
+  createdAt   DateTime  @default(now())
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId])
+  @@map("api_keys")
+}
