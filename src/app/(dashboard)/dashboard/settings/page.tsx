@@ -4,14 +4,21 @@ import { getLabels } from "@/lib/ui-labels";
 import { LanguageSelector } from "@/components/settings/language-selector";
 import { CustomInstructions } from "@/components/settings/custom-instructions";
 import { StyleExamples } from "@/components/settings/style-examples";
+import { GoogleConnectButton } from "@/components/settings/google-connect-button";
 
 export default async function SettingsPage() {
-  const { workspace, role } = await requireAuth();
+  const { session, workspace, role } = await requireAuth();
 
-  const ws = await db.workspace.findUnique({
-    where: { id: workspace.id },
-    select: { defaultLanguage: true, customInstructions: true },
-  });
+  const [ws, user] = await Promise.all([
+    db.workspace.findUnique({
+      where: { id: workspace.id },
+      select: { defaultLanguage: true, customInstructions: true },
+    }),
+    db.user.findUnique({
+      where: { id: session.user.id },
+      select: { googleEmail: true },
+    }),
+  ]);
 
   const canEdit = role === "OWNER" || role === "ADMIN";
   const labels = getLabels(workspace.defaultLanguage);
@@ -54,6 +61,14 @@ export default async function SettingsPage() {
             {labels.styleLearnDesc}
           </p>
           <StyleExamples canEdit={canEdit} />
+        </div>
+
+        <div className="rounded-xl border border-border bg-card/60 p-6">
+          <h2 className="font-semibold mb-1">חיבור חשבון Gmail</h2>
+          <p className="text-xs text-muted-foreground mb-3">
+            חבר את חשבון ה-Gmail שלך כדי לשלוח מיילים ישירות מהמערכת
+          </p>
+          <GoogleConnectButton connectedEmail={user?.googleEmail ?? null} />
         </div>
       </div>
     </div>

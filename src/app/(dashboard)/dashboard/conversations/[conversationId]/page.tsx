@@ -7,6 +7,7 @@ import { ConversationChat } from "@/components/conversations/conversation-chat";
 import { DraftUpload } from "@/components/conversations/draft-upload";
 import { DeleteButton } from "@/components/conversations/delete-button";
 import { EditableTitle } from "@/components/conversations/editable-title";
+import { SendEmailButton } from "@/components/conversations/send-email-button";
 import type { ConversationAnalysis } from "@/services/gemini/schema";
 import { db } from "@/lib/db";
 import { getLabels, isRTL } from "@/lib/ui-labels";
@@ -24,7 +25,7 @@ export default async function ConversationDetailPage({
 }: {
   params: Promise<{ conversationId: string }>;
 }) {
-  const { workspace } = await requireAuth();
+  const { session, workspace } = await requireAuth();
   const { conversationId } = await params;
 
   const conversation = await getConversation({
@@ -47,6 +48,12 @@ export default async function ConversationDetailPage({
     | null;
   const analysis = rawData;
   const customSummary = rawData?.customSummary ?? null;
+
+  const currentUser = await db.user.findUnique({
+    where: { id: session.user.id },
+    select: { googleEmail: true },
+  });
+  const isGoogleConnected = !!currentUser?.googleEmail;
 
   // Load chat messages
   let initialMessages: { id: string; role: "USER" | "ASSISTANT"; content: string; createdAt: string }[] = [];
@@ -183,7 +190,15 @@ export default async function ConversationDetailPage({
           {/* Custom Summary — FIRST: this is the primary output the user cares about */}
           {customSummary && (
             <div className="rounded-xl border border-primary/30 bg-primary/5 p-6 shadow-sm">
-              <h2 className="font-semibold mb-4 text-primary text-base">{labels.customSummaryTitle}</h2>
+              <div className="flex items-start justify-between gap-4 mb-4">
+                <h2 className="font-semibold text-primary text-base">{labels.customSummaryTitle}</h2>
+                <SendEmailButton
+                  conversationId={conversationId}
+                  subject={conversation.title}
+                  body={customSummary}
+                  isGoogleConnected={isGoogleConnected}
+                />
+              </div>
               <div className="text-sm leading-relaxed whitespace-pre-wrap">
                 {customSummary}
               </div>

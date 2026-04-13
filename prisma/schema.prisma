@@ -69,6 +69,10 @@ model User {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
+  googleAccessToken  String?
+  googleRefreshToken String?
+  googleEmail        String?
+
   memberships   WorkspaceMember[]
   conversations Conversation[]
   chatMessages  ChatMessage[]
