@@ -1,10 +1,14 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { hash } from "bcryptjs";
 import { db } from "@/lib/db";
 import { registerSchema } from "@/lib/validations/auth";
+import { rateLimit } from "@/lib/rate-limit";
 import { Prisma } from "@prisma/client";
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
+  const limited = await rateLimit(req, "register");
+  if (limited) return limited;
+
   try {
     let body: unknown;
     try {

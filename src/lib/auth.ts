@@ -4,6 +4,9 @@ import { compare } from "bcryptjs";
 import { db } from "@/lib/db";
 import { loginSchema } from "@/lib/validations/auth";
 import { WorkspaceMemberRole } from "@prisma/client";
+import { RateLimiterMemory } from "rate-limiter-flexible";
+
+const loginLimiter = new RateLimiterMemory({ points: 10, duration: 60 * 15 });
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
   session: { strategy: "jwt" },
@@ -21,6 +24,12 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         if (!parsed.success) return null;
 
         const { email, password } = parsed.data;
+
+        try {
+          await loginLimiter.consume(email);
+        } catch {
+          throw new Error("Too many login attempts. Please try again later.");
+        }
 
         const user = await db.user.findUnique({
           where: { email },
