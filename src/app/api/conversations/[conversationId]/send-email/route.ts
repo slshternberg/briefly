@@ -12,9 +12,23 @@ export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ conversationId: string }> }
 ) {
-  const { session } = await requireAuth();
+  const { session, workspace } = await requireAuth();
   const { conversationId } = await params;
   const { to, subject, body } = await req.json();
+
+  // Validate email address
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!to || !emailRegex.test(to)) {
+    return NextResponse.json({ error: "Invalid recipient email" }, { status: 400 });
+  }
+
+  // Verify conversation belongs to this workspace (IDOR protection)
+  const conversation = await db.conversation.findFirst({
+    where: { id: conversationId, workspaceId: workspace.id, deletedAt: null },
+  });
+  if (!conversation) {
+    return NextResponse.json({ error: "Conversation not found" }, { status: 404 });
+  }
 
   const user = await db.user.findUnique({
     where: { id: session.user.id },
