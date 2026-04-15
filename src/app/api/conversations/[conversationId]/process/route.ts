@@ -148,12 +148,18 @@ export async function POST(
 
       console.error("Gemini processing error:", geminiError);
 
-      const message =
-        geminiError instanceof Error
-          ? geminiError.message
-          : "AI processing failed";
+      const raw = geminiError instanceof Error ? geminiError.message : String(geminiError);
 
-      return NextResponse.json({ error: message }, { status: 502 });
+      let errorCode = "processing_failed";
+      if (raw.includes("503") || raw.includes("UNAVAILABLE") || raw.includes("high demand") || raw.includes("overloaded")) {
+        errorCode = "overloaded";
+      } else if (raw.includes("429") || raw.includes("RESOURCE_EXHAUSTED") || raw.includes("quota") || raw.includes("rate")) {
+        errorCode = "quota_exceeded";
+      } else if (raw.includes("401") || raw.includes("403") || raw.includes("API_KEY") || raw.includes("permission")) {
+        errorCode = "auth_error";
+      }
+
+      return NextResponse.json({ error: errorCode }, { status: 502 });
     }
 
     // 9. Store results — general analysis + custom summary together

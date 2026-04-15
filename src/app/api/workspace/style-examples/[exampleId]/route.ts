@@ -22,8 +22,16 @@ export async function POST(
     return NextResponse.json({ status: "COMPLETED", extractedProfile: result });
   } catch (error) {
     console.error("Process style example error:", error);
-    const message = error instanceof Error ? error.message : "Processing failed";
-    return NextResponse.json({ error: message }, { status: 500 });
+    const raw = error instanceof Error ? error.message : String(error);
+
+    let errorCode = "processing_failed";
+    if (raw.includes("503") || raw.includes("UNAVAILABLE") || raw.includes("high demand")) {
+      errorCode = "overloaded";
+    } else if (raw.includes("429") || raw.includes("RESOURCE_EXHAUSTED") || raw.includes("quota")) {
+      errorCode = "quota_exceeded";
+    }
+
+    return NextResponse.json({ error: errorCode }, { status: 500 });
   }
 }
 

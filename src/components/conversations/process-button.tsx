@@ -69,7 +69,7 @@ export function ProcessButton({
       const data = await res.json();
 
       if (!res.ok) {
-        setError(data.error || labels.processingFailed);
+        setError(data.error || "processing_failed");
         setProcessing(false);
         return;
       }
@@ -91,8 +91,36 @@ export function ProcessButton({
   return (
     <div>
       {error && (
-        <div className="mb-3 rounded-lg bg-destructive/10 border border-destructive/20 p-3 text-sm text-destructive">
-          {error}
+        <div className={`mb-3 rounded-lg p-3 text-sm border flex items-start gap-2 ${
+          error === "overloaded" || error === "quota_exceeded"
+            ? "bg-yellow-500/10 border-yellow-500/20 text-yellow-300"
+            : "bg-destructive/10 border-destructive/20 text-destructive"
+        }`}>
+          <svg className="w-4 h-4 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+          </svg>
+          <div>
+            {error === "overloaded" && <>
+              <div className="font-medium">שרת ה-AI עמוס כרגע</div>
+              <div className="text-xs mt-0.5 opacity-80">נסי שוב בעוד כמה דקות</div>
+            </>}
+            {error === "quota_exceeded" && <>
+              <div className="font-medium">המכסה היומית של ה-AI הסתיימה</div>
+              <div className="text-xs mt-0.5 opacity-80">ניתן לנסות שוב מחר או לשדרג את החשבון</div>
+            </>}
+            {error === "auth_error" && <>
+              <div className="font-medium">בעיית הרשאות עם שירות ה-AI</div>
+              <div className="text-xs mt-0.5 opacity-80">אנא פנה לתמיכה</div>
+            </>}
+            {error === "processing_failed" && <>
+              <div className="font-medium">הניתוח נכשל</div>
+              <div className="text-xs mt-0.5 opacity-80">נסי שוב, אם הבעיה חוזרת פנה לתמיכה</div>
+            </>}
+            {!["overloaded","quota_exceeded","auth_error","processing_failed"].includes(error) && <>
+              <div className="font-medium">אירעה שגיאה</div>
+              <div className="text-xs mt-0.5 opacity-80">נסי שוב מאוחר יותר</div>
+            </>}
+          </div>
         </div>
       )}
 

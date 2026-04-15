@@ -129,7 +129,14 @@ export function StyleExamples({ canEdit }: { canEdit: boolean }) {
       });
       if (!res.ok) {
         const data = await res.json();
-        setError(data.error || labels.processingFailed);
+        const code = data.error || "processing_failed";
+        if (code === "overloaded") {
+          setError("שרת ה-AI עמוס כרגע — נסי שוב בעוד כמה דקות");
+        } else if (code === "quota_exceeded") {
+          setError("המכסה היומית של ה-AI הסתיימה — נסי שוב מחר");
+        } else {
+          setError(labels.processingFailed);
+        }
       }
       await loadData();
     } catch {
