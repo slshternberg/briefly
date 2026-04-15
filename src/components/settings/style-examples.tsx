@@ -201,12 +201,12 @@ export function StyleExamples({ canEdit }: { canEdit: boolean }) {
                   <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${badge.color}`}>
                     {badge.label}
                   </span>
-                  {canEdit && ex.status === "PENDING" && (
+                  {canEdit && (ex.status === "PENDING" || ex.status === "FAILED") && (
                     <button
                       onClick={() => processExample(ex.id)}
                       className="px-2.5 py-1 rounded-lg text-xs font-medium bg-primary/10 text-primary hover:bg-primary/20 transition"
                     >
-                      {labels.analyze}
+                      {ex.status === "FAILED" ? labels.retryAnalysis : labels.analyze}
                     </button>
                   )}
                   {canEdit && (

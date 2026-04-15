@@ -22,6 +22,7 @@ export default async function DashboardPage() {
     createdByName: c.createdBy.name,
     hasAudio: c.assets.length > 0,
     sourceType: c.assets[0]?.sourceType || null,
+    durationSeconds: c.assets[0]?.durationSeconds || null,
   }));
 
   return (

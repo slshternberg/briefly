@@ -13,6 +13,7 @@ export function SendEmailButton({ conversationId, subject, body, isGoogleConnect
   const [open, setOpen] = useState(false);
   const [to, setTo] = useState("");
   const [editableSubject, setEditableSubject] = useState(subject);
+  const [editableBody, setEditableBody] = useState(body);
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
   const [error, setError] = useState("");
@@ -39,7 +40,7 @@ export function SendEmailButton({ conversationId, subject, body, isGoogleConnect
       const res = await fetch(`/api/conversations/${conversationId}/send-email`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ to, subject: editableSubject, body }),
+        body: JSON.stringify({ to, subject: editableSubject, body: editableBody }),
       });
       if (!res.ok) throw new Error();
       setSent(true);
@@ -76,7 +77,7 @@ export function SendEmailButton({ conversationId, subject, body, isGoogleConnect
 
       {open && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-          <div className="bg-card border border-border rounded-2xl p-6 w-full max-w-md shadow-xl">
+          <div className="bg-card border border-border rounded-2xl p-6 w-full max-w-2xl shadow-xl">
             <h2 className="font-semibold text-base mb-4">שלח מייל ללקוח</h2>
 
             <div className="space-y-3">
@@ -99,6 +100,16 @@ export function SendEmailButton({ conversationId, subject, body, isGoogleConnect
                   onChange={(e) => setEditableSubject(e.target.value)}
                   dir="auto"
                   className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-muted-foreground mb-1">תוכן המייל</label>
+                <textarea
+                  value={editableBody}
+                  onChange={(e) => setEditableBody(e.target.value)}
+                  dir="auto"
+                  rows={12}
+                  className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition resize-y"
                 />
               </div>
             </div>

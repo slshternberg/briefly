@@ -8,6 +8,8 @@ import { DraftUpload } from "@/components/conversations/draft-upload";
 import { DeleteButton } from "@/components/conversations/delete-button";
 import { EditableTitle } from "@/components/conversations/editable-title";
 import { SendEmailButton } from "@/components/conversations/send-email-button";
+import { CopyButton } from "@/components/conversations/copy-button";
+import { ExportPdfButton } from "@/components/conversations/export-pdf-button";
 import type { ConversationAnalysis } from "@/services/gemini/schema";
 import { db } from "@/lib/db";
 import { getLabels, isRTL } from "@/lib/ui-labels";
@@ -93,7 +95,24 @@ export default async function ConversationDetailPage({
         >
           {rtl ? "→" : "←"} {labels.back}
         </Link>
-        <DeleteButton conversationId={conversation.id} />
+        <div className="flex items-center gap-2">
+          {analysis && analysis.contentType !== "insufficient_content" && (
+            <ExportPdfButton
+              title={conversation.title}
+              rtl={rtl}
+              sections={[
+                ...(customSummary ? [{ heading: labels.customSummaryTitle, content: customSummary }] : []),
+                { heading: labels.internalSummary, content: analysis.internalSummary },
+                { heading: labels.clientSummary, content: analysis.clientFriendlySummary },
+                { heading: labels.actionItems, content: analysis.actionItems.join("\n") },
+                { heading: labels.keyTopics, content: analysis.keyTopics.join("\n") },
+                { heading: labels.decisions, content: analysis.decisions.join("\n") },
+                ...(analysis.suggestedEmailBody ? [{ heading: labels.followUpEmail, content: `${analysis.suggestedEmailSubject}\n\n${analysis.suggestedEmailBody}` }] : []),
+              ]}
+            />
+          )}
+          <DeleteButton conversationId={conversation.id} />
+        </div>
       </div>
 
       {/* Title + status */}
@@ -192,12 +211,15 @@ export default async function ConversationDetailPage({
             <div className="rounded-xl border border-primary/30 bg-primary/5 p-6 shadow-sm">
               <div className="flex items-start justify-between gap-4 mb-4">
                 <h2 className="font-semibold text-primary text-base">{labels.customSummaryTitle}</h2>
-                <SendEmailButton
-                  conversationId={conversationId}
-                  subject={conversation.title}
-                  body={customSummary}
-                  isGoogleConnected={isGoogleConnected}
-                />
+                <div className="flex items-center gap-2 shrink-0">
+                  <CopyButton text={customSummary} />
+                  <SendEmailButton
+                    conversationId={conversationId}
+                    subject={conversation.title}
+                    body={customSummary}
+                    isGoogleConnected={isGoogleConnected}
+                  />
+                </div>
               </div>
               <div className="text-sm leading-relaxed whitespace-pre-wrap">
                 {customSummary}
@@ -205,13 +227,13 @@ export default async function ConversationDetailPage({
             </div>
           )}
 
-          <AnalysisSection title={labels.internalSummary}>
+          <AnalysisSection title={labels.internalSummary} copyText={analysis.internalSummary}>
             <p className="text-sm text-muted-foreground whitespace-pre-wrap leading-relaxed">
               {analysis.internalSummary}
             </p>
           </AnalysisSection>
 
-          <AnalysisSection title={labels.clientSummary}>
+          <AnalysisSection title={labels.clientSummary} copyText={analysis.clientFriendlySummary}>
             <p className="text-sm text-muted-foreground whitespace-pre-wrap leading-relaxed">
               {analysis.clientFriendlySummary}
             </p>
@@ -313,23 +335,32 @@ export default async function ConversationDetailPage({
 
 function AnalysisSection({
   title,
+  copyText,
   children,
 }: {
   title: string;
+  copyText?: string;
   children: React.ReactNode;
 }) {
   return (
     <div className="rounded-xl border border-border bg-card/60 p-5">
-      <h2 className="font-semibold mb-3">{title}</h2>
+      <div className="flex items-center justify-between mb-3">
+        <h2 className="font-semibold">{title}</h2>
+        {copyText && <CopyButton text={copyText} />}
+      </div>
       {children}
     </div>
   );
 }
 
 function ListSection({ title, items, empty }: { title: string; items: string[]; empty: string }) {
+  const copyText = items.join("\n");
   return (
     <div className="rounded-xl border border-border bg-card/60 p-5">
-      <h2 className="font-semibold mb-3">{title}</h2>
+      <div className="flex items-center justify-between mb-3">
+        <h2 className="font-semibold">{title}</h2>
+        {items.length > 0 && <CopyButton text={copyText} />}
+      </div>
       {items.length === 0 ? (
         <p className="text-sm text-muted-foreground/60">{empty}</p>
       ) : (

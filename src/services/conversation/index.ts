@@ -107,7 +107,7 @@ export async function listConversations(params: {
   return db.conversation.findMany({
     where: { workspaceId, deletedAt: null },
     include: {
-      assets: { select: { id: true, sourceType: true, mimeType: true, sizeBytes: true } },
+      assets: { select: { id: true, sourceType: true, mimeType: true, sizeBytes: true, durationSeconds: true } },
       createdBy: { select: { name: true } },
     },
     orderBy: { createdAt: "desc" },
