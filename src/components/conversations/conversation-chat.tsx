@@ -107,7 +107,7 @@ export function ConversationChat({
           </svg>
         </div>
         <p className="text-sm font-medium">{rtl ? "הפיצ׳ר בבנייה" : "Feature in development"}</p>
-        <p className="text-xs text-muted-foreground">{rtl ? "תודה על הסבלנות 🙏" : "Thank you for your patience 🙏"}</p>
+        <p className="text-xs text-muted-foreground">{rtl ? "תודה על הסבלנות" : "Thank you for your patience"}</p>
       </div>
     </div>
   );

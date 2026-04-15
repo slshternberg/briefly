@@ -9,7 +9,6 @@ import { DeleteButton } from "@/components/conversations/delete-button";
 import { EditableTitle } from "@/components/conversations/editable-title";
 import { SendEmailButton } from "@/components/conversations/send-email-button";
 import { CopyButton } from "@/components/conversations/copy-button";
-import { ExportPdfButton } from "@/components/conversations/export-pdf-button";
 import type { ConversationAnalysis } from "@/services/gemini/schema";
 import { db } from "@/lib/db";
 import { getLabels, isRTL } from "@/lib/ui-labels";
@@ -96,21 +95,6 @@ export default async function ConversationDetailPage({
           {rtl ? "→" : "←"} {labels.back}
         </Link>
         <div className="flex items-center gap-2">
-          {analysis && analysis.contentType !== "insufficient_content" && (
-            <ExportPdfButton
-              title={conversation.title}
-              rtl={rtl}
-              sections={[
-                ...(customSummary ? [{ heading: labels.customSummaryTitle, content: customSummary }] : []),
-                { heading: labels.internalSummary, content: analysis.internalSummary },
-                { heading: labels.clientSummary, content: analysis.clientFriendlySummary },
-                { heading: labels.actionItems, content: analysis.actionItems.join("\n") },
-                { heading: labels.keyTopics, content: analysis.keyTopics.join("\n") },
-                { heading: labels.decisions, content: analysis.decisions.join("\n") },
-                ...(analysis.suggestedEmailBody ? [{ heading: labels.followUpEmail, content: `${analysis.suggestedEmailSubject}\n\n${analysis.suggestedEmailBody}` }] : []),
-              ]}
-            />
-          )}
           <DeleteButton conversationId={conversation.id} />
         </div>
       </div>
