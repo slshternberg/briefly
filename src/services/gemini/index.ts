@@ -21,8 +21,48 @@ function getClient(): GoogleGenAI {
   return new GoogleGenAI({ apiKey });
 }
 
-function getModel(): string {
-  return process.env.GEMINI_MODEL || "gemini-2.5-flash-preview-05-20";
+// ============================================================================
+// Model fallback — tries models in order, switches immediately on 503
+// ============================================================================
+
+const PRIMARY_MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash-preview-05-20";
+const FALLBACK_MODEL = "gemini-2.0-flash";
+
+function isOverloadedError(error: unknown): boolean {
+  const raw = error instanceof Error ? error.message : String(error);
+  return (
+    raw.includes("503") ||
+    raw.includes("UNAVAILABLE") ||
+    raw.includes("high demand") ||
+    raw.includes("overloaded")
+  );
+}
+
+async function withModelFallback<T>(
+  fn: (model: string) => Promise<T>
+): Promise<{ result: T; modelUsed: string }> {
+  // Try primary model first
+  try {
+    const result = await fn(PRIMARY_MODEL);
+    return { result, modelUsed: PRIMARY_MODEL };
+  } catch (error) {
+    if (!isOverloadedError(error)) throw error;
+    console.log(`Gemini primary model overloaded → switching to ${FALLBACK_MODEL}`);
+  }
+
+  // Fallback model — one retry with delay if also overloaded
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const result = await fn(FALLBACK_MODEL);
+      return { result, modelUsed: FALLBACK_MODEL };
+    } catch (error) {
+      if (!isOverloadedError(error) || attempt === 1) throw error;
+      console.log(`Fallback model overloaded — waiting 10s before retry...`);
+      await new Promise((resolve) => setTimeout(resolve, 10000));
+    }
+  }
+
+  throw new Error("Unreachable");
 }
 
 // ============================================================================
@@ -92,7 +132,6 @@ export async function analyzeConversationAudio(
   params: AnalyzeAudioParams
 ): Promise<AnalyzeAudioResult> {
   const ai = getClient();
-  const model = getModel();
 
   // Step 1: Upload audio file once
   const { file, fileName } = await uploadAndWaitForFile(
@@ -117,21 +156,23 @@ export async function analyzeConversationAudio(
     styleProfile: params.styleProfile,
   });
 
-  const response = await ai.models.generateContent({
-    model,
-    contents: [
-      {
-        role: "user",
-        parts: [fileDataPart, { text: buildAnalysisUserMessage() }],
+  const { result: response, modelUsed } = await withModelFallback((model) =>
+    ai.models.generateContent({
+      model,
+      contents: [
+        {
+          role: "user",
+          parts: [fileDataPart, { text: buildAnalysisUserMessage() }],
+        },
+      ],
+      config: {
+        systemInstruction,
+        responseMimeType: "application/json",
+        responseSchema: conversationAnalysisSchema,
+        temperature: 0.2,
       },
-    ],
-    config: {
-      systemInstruction,
-      responseMimeType: "application/json",
-      responseSchema: conversationAnalysisSchema,
-      temperature: 0.2,
-    },
-  });
+    })
+  );
 
   const rawResponse = response.text ?? "";
 
@@ -244,25 +285,27 @@ USER'S CUSTOM INSTRUCTIONS:
 ${params.customPrompt}`;
 
     try {
-      const customResponse = await ai.models.generateContent({
-        model,
-        contents: [
-          {
-            role: "user",
-            parts: [
-              fileDataPart,
-              {
-                text: "Analyze this audio recording according to the custom instructions provided in your system prompt. Respond based ONLY on what was actually said.",
-              },
-            ],
+      const { result: customResponse } = await withModelFallback((model) =>
+        ai.models.generateContent({
+          model,
+          contents: [
+            {
+              role: "user",
+              parts: [
+                fileDataPart,
+                {
+                  text: "Analyze this audio recording according to the custom instructions provided in your system prompt. Respond based ONLY on what was actually said.",
+                },
+              ],
+            },
+          ],
+          config: {
+            systemInstruction: customSystemInstruction,
+            temperature: 0.3,
+            maxOutputTokens: 10000,
           },
-        ],
-        config: {
-          systemInstruction: customSystemInstruction,
-          temperature: 0.3,
-          maxOutputTokens: 10000,
-        },
-      });
+        })
+      );
 
       rawCustomResponse = customResponse.text ?? "";
       customSummary = rawCustomResponse;
@@ -291,7 +334,7 @@ ${params.customPrompt}`;
     customSummary,
     rawResponse,
     rawCustomResponse,
-    modelUsed: model,
+    modelUsed,
     promptTokens: totalPromptTokens,
     outputTokens: totalOutputTokens,
   };
@@ -317,10 +360,9 @@ export async function chatWithConversation(
   params: ChatParams
 ): Promise<ChatResult> {
   const ai = getClient();
-  const model = getModel();
 
   const response = await ai.models.generateContent({
-    model,
+    model: PRIMARY_MODEL,
     contents: params.contents,
     config: {
       systemInstruction: params.systemInstruction,
@@ -334,7 +376,7 @@ export async function chatWithConversation(
 
   return {
     response: text,
-    modelUsed: model,
+    modelUsed: PRIMARY_MODEL,
     promptTokens: usage?.promptTokenCount ?? null,
     outputTokens: usage?.candidatesTokenCount ?? null,
   };
