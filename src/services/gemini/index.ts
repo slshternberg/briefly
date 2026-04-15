@@ -25,16 +25,21 @@ function getClient(): GoogleGenAI {
 // Model fallback — tries models in order, switches immediately on 503
 // ============================================================================
 
-const PRIMARY_MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash-preview-05-20";
-const FALLBACK_MODEL = "gemini-2.0-flash";
+const PRIMARY_MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash";
+const FALLBACK_MODEL = "gemini-2.5-flash-lite";
 
-function isOverloadedError(error: unknown): boolean {
+function isRetriableError(error: unknown): boolean {
   const raw = error instanceof Error ? error.message : String(error);
   return (
     raw.includes("503") ||
     raw.includes("UNAVAILABLE") ||
     raw.includes("high demand") ||
-    raw.includes("overloaded")
+    raw.includes("overloaded") ||
+    raw.includes("fetch failed") ||
+    raw.includes("timeout") ||
+    raw.includes("Timeout") ||
+    raw.includes("TIMEOUT") ||
+    raw.includes("UND_ERR")
   );
 }
 
@@ -46,7 +51,7 @@ async function withModelFallback<T>(
     const result = await fn(PRIMARY_MODEL);
     return { result, modelUsed: PRIMARY_MODEL };
   } catch (error) {
-    if (!isOverloadedError(error)) throw error;
+    if (!isRetriableError(error)) throw error;
     console.log(`Gemini primary model overloaded → switching to ${FALLBACK_MODEL}`);
   }
 
@@ -56,7 +61,7 @@ async function withModelFallback<T>(
       const result = await fn(FALLBACK_MODEL);
       return { result, modelUsed: FALLBACK_MODEL };
     } catch (error) {
-      if (!isOverloadedError(error) || attempt === 1) throw error;
+      if (!isRetriableError(error) || attempt === 1) throw error;
       console.log(`Fallback model overloaded — waiting 10s before retry...`);
       await new Promise((resolve) => setTimeout(resolve, 10000));
     }

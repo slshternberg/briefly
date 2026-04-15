@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { getStorageProvider } from "@/services/storage";
 import { analyzeConversationAudio } from "@/services/gemini";
 import { getActiveStyleProfile } from "@/services/style";
+import { sendAnalysisCompleteNotification } from "@/services/gmail";
 
 export async function POST(
   req: Request,
@@ -23,6 +24,7 @@ export async function POST(
     // 2. Read request body
     let outputLanguage = "Hebrew";
     let conversationInstructions: string | undefined;
+    let sendNotification = false;
     try {
       const body = await req.json();
       if (body.outputLanguage && typeof body.outputLanguage === "string") {
@@ -30,6 +32,9 @@ export async function POST(
       }
       if (body.conversationInstructions && typeof body.conversationInstructions === "string") {
         conversationInstructions = body.conversationInstructions.slice(0, 3000);
+      }
+      if (body.sendNotification === true) {
+        sendNotification = true;
       }
     } catch {
       // No body or invalid JSON — use defaults
@@ -193,6 +198,17 @@ export async function POST(
         data: { status: "COMPLETED", language: outputLanguage },
       }),
     ]);
+
+    // Send notification email (only if user opted in — fire-and-forget)
+    if (sendNotification) {
+      const baseUrl = process.env.AUTH_URL || "http://localhost:3000";
+      sendAnalysisCompleteNotification({
+        userId: session.user.id,
+        conversationId,
+        conversationTitle: conversation.title,
+        baseUrl,
+      });
+    }
 
     return NextResponse.json({
       status: "COMPLETED",

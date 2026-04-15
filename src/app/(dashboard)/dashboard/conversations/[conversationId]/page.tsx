@@ -12,6 +12,7 @@ import { CopyButton } from "@/components/conversations/copy-button";
 import type { ConversationAnalysis } from "@/services/gemini/schema";
 import { db } from "@/lib/db";
 import { getLabels, isRTL } from "@/lib/ui-labels";
+import { calculateGeminiCost } from "@/services/gmail";
 
 const STATUS_COLORS: Record<string, string> = {
   DRAFT: "bg-muted text-muted-foreground",
@@ -55,6 +56,14 @@ export default async function ConversationDetailPage({
     select: { googleEmail: true },
   });
   const isGoogleConnected = !!currentUser?.googleEmail;
+
+  const analysisCost = conversation.summary
+    ? calculateGeminiCost(
+        conversation.summary.modelUsed ?? "",
+        conversation.summary.promptTokens,
+        conversation.summary.outputTokens
+      )
+    : null;
 
   // Load chat messages
   let initialMessages: { id: string; role: "USER" | "ASSISTANT"; content: string; createdAt: string }[] = [];
@@ -160,6 +169,7 @@ export default async function ConversationDetailPage({
             conversationId={conversation.id}
             status={conversation.status}
             defaultLanguage={lang}
+            isGoogleConnected={isGoogleConnected}
             labels={{
               analyze: labels.analyze,
               reanalyze: labels.reanalyze,
@@ -294,6 +304,13 @@ export default async function ConversationDetailPage({
         <div className="rounded-xl border border-yellow-500/20 bg-yellow-500/5 p-6 text-center">
           <div className="w-8 h-8 mx-auto mb-3 border-2 border-primary border-t-transparent rounded-full animate-spin" />
           <p className="text-sm text-muted-foreground">{labels.processingMessage}</p>
+        </div>
+      )}
+
+      {/* Analysis cost */}
+      {analysisCost !== null && (
+        <div className="mt-2 text-xs text-muted-foreground/50 text-end">
+          {rtl ? "עלות ניתוח" : "Analysis cost"}: ~${analysisCost.toFixed(4)}
         </div>
       )}
 

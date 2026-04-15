@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { isRTL } from "@/lib/ui-labels";
 
 const LANGUAGES = [
   { value: "Hebrew", label: "עברית" },
@@ -18,6 +19,7 @@ interface ProcessButtonProps {
   conversationId: string;
   status: string;
   defaultLanguage: string;
+  isGoogleConnected: boolean;
   labels: {
     analyze: string;
     reanalyze: string;
@@ -36,6 +38,7 @@ export function ProcessButton({
   conversationId,
   status,
   defaultLanguage,
+  isGoogleConnected,
   labels,
 }: ProcessButtonProps) {
   const router = useRouter();
@@ -44,6 +47,7 @@ export function ProcessButton({
   const [language, setLanguage] = useState(defaultLanguage);
   const [instructions, setInstructions] = useState("");
   const [showInstructions, setShowInstructions] = useState(false);
+  const [sendNotification, setSendNotification] = useState(false);
 
   const canProcess = status === "UPLOADED" || status === "FAILED";
   const isCompleted = status === "COMPLETED";
@@ -62,6 +66,7 @@ export function ProcessButton({
           body: JSON.stringify({
             outputLanguage: language,
             conversationInstructions: instructions.trim() || undefined,
+            sendNotification: isGoogleConnected && sendNotification,
           }),
         }
       );
@@ -169,6 +174,20 @@ export function ProcessButton({
             />
           )}
         </div>
+      )}
+
+      {isGoogleConnected && !isProcessing && (canProcess || isCompleted) && (
+        <label className="flex items-center gap-2 mt-2 cursor-pointer w-fit">
+          <input
+            type="checkbox"
+            checked={sendNotification}
+            onChange={(e) => setSendNotification(e.target.checked)}
+            className="rounded border-border accent-primary"
+          />
+          <span className="text-xs text-muted-foreground">
+            {isRTL(defaultLanguage) ? "שלח לי מייל כשיסתיים" : "Notify me by email when done"}
+          </span>
+        </label>
       )}
 
       {isProcessing && (
