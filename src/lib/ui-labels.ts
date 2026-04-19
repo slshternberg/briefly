@@ -208,6 +208,15 @@ export interface UILabels {
   screenDenied: string;
   noSystemAudio: string;
 
+  // Mic permission denied guide
+  micDeniedTitle: string;
+  micDeniedExplain: string;
+  micDeniedStep1: string;
+  micDeniedStep1b: string;
+  micDeniedStep2: string;
+  micDeniedStep3: string;
+  micDeniedRetry: string;
+
   // Meet guide
   meetGuideTitleBoth: string;
   meetGuideTitleScreen: string;
@@ -450,6 +459,15 @@ const LABELS: Record<string, UILabels> = {
     screenDenied: "גישת שיתוף מסך נדחתה או בוטלה.",
     noSystemAudio: 'לא נמצא אודיו. סמן “שתף אודיו מהטאב” בדיאלוג השיתוף ונסה שוב.',
 
+    // Mic permission denied guide
+    micDeniedTitle: 'הגישה למיקרופון חסומה',
+    micDeniedExplain: 'הדפדפן חסם גישה למיקרופון. כך מאפשרים אותה ב-Chrome:',
+    micDeniedStep1: 'לחצי על המנעול',
+    micDeniedStep1b: 'בסרגל הכתובת (ליד כתובת האתר)',
+    micDeniedStep2: 'בחרי “הגדרות אתר” ← מצאי “מיקרופון” ← שני ל-”אפשר”',
+    micDeniedStep3: 'חזרי לכאן ולחצי “נסה שוב” — ההקלטה תתחיל מיד',
+    micDeniedRetry: 'נסה שוב — אישרתי גישה למיקרופון',
+
     // Meet guide
     meetGuideTitleBoth: 'איך להקליט פגישה + המיקרופון שלך',
     meetGuideTitleScreen: 'איך להקליט פגישה',
@@ -691,6 +709,15 @@ const LABELS: Record<string, UILabels> = {
     screenDenied: "Screen share was denied or cancelled.",
     noSystemAudio: "No audio captured. Tick \"Share tab audio\" in the share dialog and try again.",
 
+    // Mic permission denied guide
+    micDeniedTitle: 'Microphone access is blocked',
+    micDeniedExplain: 'Your browser blocked microphone access. To fix it in Chrome:',
+    micDeniedStep1: 'Click the lock icon',
+    micDeniedStep1b: 'in the address bar (left of the URL)',
+    micDeniedStep2: 'Go to "Site settings" \u2192 find "Microphone" \u2192 change to "Allow"',
+    micDeniedStep3: 'Come back here and click "Try again" \u2014 recording will start immediately',
+    micDeniedRetry: 'Try again \u2014 I allowed microphone access',
+
     // Meet guide
     meetGuideTitleBoth: 'How to record a meeting + your microphone',
     meetGuideTitleScreen: 'How to record a meeting',
@@ -931,6 +958,15 @@ const LABELS: Record<string, UILabels> = {
     recordingBoth: "רעקאָרדירט באַגעגעניש + מיקראָפֿאָן",
     screenDenied: "עקראַן-טיילן צוטריט אָפּגעזאָגט.",
     noSystemAudio: 'קיין אַודיאָ. קלויבט “שיין טאַב אַודיאָ” און פּרובירט נאָכאַמאָל.',
+
+    // Mic permission denied guide (Yiddish — fallback to English)
+    micDeniedTitle: 'Microphone access is blocked',
+    micDeniedExplain: 'Your browser blocked microphone access. To fix it in Chrome:',
+    micDeniedStep1: 'Click the lock icon',
+    micDeniedStep1b: 'in the address bar (left of the URL)',
+    micDeniedStep2: 'Go to “Site settings” \u2192 find “Microphone” \u2192 change to “Allow”',
+    micDeniedStep3: 'Come back here and click “Try again” \u2014 recording will start immediately',
+    micDeniedRetry: 'Try again \u2014 I allowed microphone access',
 
     // Meet guide (Yiddish — fallback to English)
     meetGuideTitleBoth: 'How to record a meeting + your microphone',

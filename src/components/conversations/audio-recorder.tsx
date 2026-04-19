@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRecorder, type RecorderSource } from "@/hooks/use-recorder";
 import { RecordingVisualizer } from "./recording-visualizer";
 import { useLabels } from "@/lib/client-language";
@@ -37,6 +37,21 @@ export function AudioRecorder({
   const [mp3Busy, setMp3Busy] = useState(false);
   const [mp3Error, setMp3Error] = useState("");
   const [pendingSource, setPendingSource] = useState<RecorderSource | null>(null);
+  const [micDenied, setMicDenied] = useState(false);
+  const permWatcherRef = useRef<PermissionStatus | null>(null);
+
+  // Check mic permission on mount and watch for changes
+  useEffect(() => {
+    if (typeof navigator === "undefined" || !navigator.permissions) return;
+    navigator.permissions.query({ name: "microphone" as PermissionName }).then((status) => {
+      setMicDenied(status.state === "denied");
+      permWatcherRef.current = status;
+      status.onchange = () => setMicDenied(status.state === "denied");
+    }).catch(() => {});
+    return () => {
+      if (permWatcherRef.current) permWatcherRef.current.onchange = null;
+    };
+  }, []);
 
   // Notify parent exactly once when recording is complete
   useEffect(() => {
@@ -61,14 +76,23 @@ export function AudioRecorder({
     }
   }
 
+  const isDenied = micDenied || recorder.error === "mic_denied";
   const labelKey = ERROR_LABEL_MAP[recorder.error];
-  const errorMessage = labelKey
+  const errorMessage = (!isDenied && labelKey)
     ? (labels[labelKey as keyof typeof labels] as string)
     : "";
 
   return (
     <div className="rounded-xl border border-border bg-card/60 p-6">
       <h3 className="font-semibold mb-4">{labels.recordAudioTitle}</h3>
+
+      {/* Mic permission denied — visual guide */}
+      {isDenied && (
+        <MicPermissionGuide
+          labels={labels}
+          onRetry={() => { recorder.reset(); recorder.start("mic"); }}
+        />
+      )}
 
       {errorMessage && (
         <div className="mb-4 rounded-lg bg-destructive/10 border border-destructive/20 p-3 text-sm text-destructive">
@@ -83,7 +107,7 @@ export function AudioRecorder({
       )}
 
       {/* IDLE — show 3 source options, or a pre-share guide for screen modes */}
-      {recorder.state === "idle" && !pendingSource && (
+      {!isDenied && recorder.state === "idle" && !pendingSource && (
         <SourcePicker
           disabled={disabled}
           onPick={(src) => {
@@ -98,7 +122,7 @@ export function AudioRecorder({
       )}
 
       {/* Pre-share guide for screen/both modes */}
-      {recorder.state === "idle" && pendingSource && pendingSource !== "mic" && (
+      {!isDenied && recorder.state === "idle" && pendingSource && pendingSource !== "mic" && (
         <MeetGuide
           source={pendingSource}
           labels={labels}
@@ -294,6 +318,79 @@ function sourceLabel(source: RecorderSource, labels: ReturnType<typeof useLabels
   if (source === "screen") return labels.recordingScreen;
   if (source === "both") return labels.recordingBoth;
   return labels.recording;
+}
+
+// ============================================================================
+// Mic Permission Denied — visual step-by-step guide
+// ============================================================================
+
+function MicPermissionGuide({
+  labels,
+  onRetry,
+}: {
+  labels: ReturnType<typeof useLabels>;
+  onRetry: () => void;
+}) {
+  return (
+    <div className="space-y-4">
+      <div className="rounded-lg border border-yellow-500/30 bg-yellow-500/5 p-4">
+        <div className="flex items-center gap-2 mb-3">
+          <svg className="w-5 h-5 text-yellow-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+          </svg>
+          <span className="text-sm font-semibold text-yellow-400">
+            {labels.micDeniedTitle ?? 'הגישה למיקרופון חסומה'}
+          </span>
+        </div>
+
+        <p className="text-sm text-muted-foreground mb-4">
+          {labels.micDeniedExplain ?? 'הדפדפן חסם גישה למיקרופון. כך מאפשרים אותה ב-Chrome:'}
+        </p>
+
+        <ol className="space-y-3">
+          <li className="flex gap-3 items-start">
+            <span className="shrink-0 w-6 h-6 rounded-full bg-yellow-500/20 text-yellow-400 text-xs flex items-center justify-center font-bold mt-0.5">1</span>
+            <div>
+              <p className="text-sm text-muted-foreground">
+                {labels.micDeniedStep1 ?? 'לחצי על המנעול'}
+                {' '}
+                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-border/60 text-xs font-mono align-middle">
+                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
+                  </svg>
+                </span>
+                {' '}
+                {labels.micDeniedStep1b ?? 'בסרגל הכתובת (שמאל לכתובת האתר)'}
+              </p>
+            </div>
+          </li>
+          <li className="flex gap-3 items-start">
+            <span className="shrink-0 w-6 h-6 rounded-full bg-yellow-500/20 text-yellow-400 text-xs flex items-center justify-center font-bold mt-0.5">2</span>
+            <p className="text-sm text-muted-foreground">
+              {labels.micDeniedStep2 ?? 'בחרי "הגדרות אתר" ← מצאי "מיקרופון" ← שני ל-"אפשר"'}
+            </p>
+          </li>
+          <li className="flex gap-3 items-start">
+            <span className="shrink-0 w-6 h-6 rounded-full bg-yellow-500/20 text-yellow-400 text-xs flex items-center justify-center font-bold mt-0.5">3</span>
+            <p className="text-sm text-muted-foreground">
+              {labels.micDeniedStep3 ?? 'חזרי לכאן ולחצי "נסה שוב" — ההקלטה תתחיל מיד'}
+            </p>
+          </li>
+        </ol>
+      </div>
+
+      <button
+        type="button"
+        onClick={onRetry}
+        className="w-full rounded-lg py-2.5 bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/80 transition flex items-center justify-center gap-2"
+      >
+        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
+        </svg>
+        {labels.micDeniedRetry ?? 'נסה שוב — אישרתי גישה למיקרופון'}
+      </button>
+    </div>
+  );
 }
 
 // ============================================================================
