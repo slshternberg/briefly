@@ -103,13 +103,14 @@ export async function POST(
       });
     }
 
-    // 5. Load recent chat history
+    // 5. Load recent chat history (desc + reverse = last N in chronological order)
     const previousMessages = await db.chatMessage.findMany({
       where: { threadId: thread.id, workspaceId },
-      orderBy: { createdAt: "asc" },
+      orderBy: { createdAt: "desc" },
       take: MAX_HISTORY_MESSAGES,
       select: { role: true, content: true },
     });
+    previousMessages.reverse();
 
     const chatHistory = previousMessages.map((m) => ({
       role: m.role === "USER" ? ("user" as const) : ("assistant" as const),

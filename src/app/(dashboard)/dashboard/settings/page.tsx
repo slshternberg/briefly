@@ -5,6 +5,7 @@ import { LanguageSelector } from "@/components/settings/language-selector";
 import { CustomInstructions } from "@/components/settings/custom-instructions";
 import { StyleExamples } from "@/components/settings/style-examples";
 import { GoogleConnectButton } from "@/components/settings/google-connect-button";
+import { DeleteAccount } from "@/components/settings/delete-account";
 
 export default async function SettingsPage() {
   const { session, workspace, role } = await requireAuth();
@@ -16,7 +17,7 @@ export default async function SettingsPage() {
     }),
     db.user.findUnique({
       where: { id: session.user.id },
-      select: { googleEmail: true },
+      select: { googleEmail: true, email: true },
     }),
   ]);
 
@@ -69,6 +70,14 @@ export default async function SettingsPage() {
             חבר את חשבון ה-Gmail שלך כדי לשלוח מיילים ישירות מהמערכת
           </p>
           <GoogleConnectButton connectedEmail={user?.googleEmail ?? null} />
+        </div>
+
+        <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-6">
+          <h2 className="font-semibold mb-1 text-destructive">מחיקת חשבון</h2>
+          <p className="text-xs text-muted-foreground mb-4">
+            מחיקה סופית של החשבון וכל הנתונים הקשורים אליו.
+          </p>
+          <DeleteAccount userEmail={user?.email ?? session.user.email ?? ""} />
         </div>
       </div>
     </div>
