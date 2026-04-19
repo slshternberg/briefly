@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { rateLimitUser } from "@/lib/rate-limit";
+import { checkConversationLimit, incrementConversationUsage } from "@/lib/billing";
 import { getStorageProvider } from "@/services/storage";
 import { analyzeConversationAudio } from "@/services/gemini";
 import { getActiveStyleProfile } from "@/services/style";
@@ -25,6 +26,12 @@ export async function POST(
     // Rate limit: max 20 process calls per hour per user
     const limited = await rateLimitUser(session.user.id, "process");
     if (limited) return limited;
+
+    // Billing: check monthly conversation limit
+    const limitError = await checkConversationLimit(workspaceId);
+    if (limitError) {
+      return NextResponse.json({ error: limitError }, { status: 402 });
+    }
 
     // 2. Read request body
     let outputLanguage = "Hebrew";
@@ -203,6 +210,11 @@ export async function POST(
         data: { status: "COMPLETED", language: outputLanguage },
       }),
     ]);
+
+    // Increment usage record (fire-and-forget)
+    incrementConversationUsage(workspaceId, asset.durationSeconds ?? 0).catch(
+      (err) => console.error("Usage increment failed:", err)
+    );
 
     // Send notification email (only if user opted in — fire-and-forget)
     if (sendNotification) {

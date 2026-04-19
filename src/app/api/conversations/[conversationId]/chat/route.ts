@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { rateLimitUser } from "@/lib/rate-limit";
+import { checkAiQueryLimit, incrementAiQueryUsage } from "@/lib/billing";
 import { chatWithConversation } from "@/services/gemini";
 import { buildConversationChatPrompt } from "@/services/ai/prompts";
 import type { ConversationAnalysis } from "@/services/gemini/schema";
@@ -28,6 +29,12 @@ export async function POST(
     // Rate limit: max 60 chat calls per hour per user
     const limited = await rateLimitUser(userId, "chat");
     if (limited) return limited;
+
+    // Billing: check monthly AI query limit
+    const limitError = await checkAiQueryLimit(workspaceId);
+    if (limitError) {
+      return NextResponse.json({ error: limitError }, { status: 402 });
+    }
 
     // 2. Parse body
     let question: string;
@@ -160,6 +167,11 @@ export async function POST(
         },
       }),
     ]);
+
+    // Increment AI query usage (fire-and-forget)
+    incrementAiQueryUsage(workspaceId).catch(
+      (err) => console.error("AI usage increment failed:", err)
+    );
 
     return NextResponse.json({
       threadId: thread.id,
