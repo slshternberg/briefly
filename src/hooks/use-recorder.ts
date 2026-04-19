@@ -146,6 +146,8 @@ export function useRecorder(maxSeconds = 7200): UseRecorderReturn {
 
     // Mix mic + system audio through Web Audio
     const ctx = new AudioContext();
+    // Chrome may create AudioContext in "suspended" state — resume it explicitly
+    if (ctx.state === "suspended") await ctx.resume();
     const dest = ctx.createMediaStreamDestination();
 
     const sysSource = ctx.createMediaStreamSource(
@@ -221,6 +223,7 @@ export function useRecorder(maxSeconds = 7200): UseRecorderReturn {
       try {
         const ctx = audioContextRef.current ?? new AudioContext();
         if (!audioContextRef.current) audioContextRef.current = ctx;
+        if (ctx.state === "suspended") await ctx.resume();
 
         const audioOnly = new MediaStream(visualisationStream.getAudioTracks());
         if (audioOnly.getAudioTracks().length > 0) {

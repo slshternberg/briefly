@@ -36,6 +36,7 @@ export function AudioRecorder({
   const recorder = useRecorder(maxMinutes * 60);
   const [mp3Busy, setMp3Busy] = useState(false);
   const [mp3Error, setMp3Error] = useState("");
+  const [pendingSource, setPendingSource] = useState<RecorderSource | null>(null);
 
   // Notify parent exactly once when recording is complete
   useEffect(() => {
@@ -81,12 +82,28 @@ export function AudioRecorder({
         </div>
       )}
 
-      {/* IDLE — show 3 source options */}
-      {recorder.state === "idle" && (
+      {/* IDLE — show 3 source options, or a pre-share guide for screen modes */}
+      {recorder.state === "idle" && !pendingSource && (
         <SourcePicker
           disabled={disabled}
-          onPick={(src) => recorder.start(src)}
+          onPick={(src) => {
+            if (src === "mic") {
+              recorder.start(src);
+            } else {
+              setPendingSource(src);
+            }
+          }}
           labels={labels}
+        />
+      )}
+
+      {/* Pre-share guide for screen/both modes */}
+      {recorder.state === "idle" && pendingSource && pendingSource !== "mic" && (
+        <MeetGuide
+          source={pendingSource}
+          labels={labels}
+          onStart={() => { setPendingSource(null); recorder.start(pendingSource); }}
+          onBack={() => setPendingSource(null)}
         />
       )}
 
@@ -277,4 +294,83 @@ function sourceLabel(source: RecorderSource, labels: ReturnType<typeof useLabels
   if (source === "screen") return labels.recordingScreen;
   if (source === "both") return labels.recordingBoth;
   return labels.recording;
+}
+
+// ============================================================================
+// Meet Guide — shown before screen share dialog opens
+// ============================================================================
+
+function MeetGuide({
+  source,
+  labels,
+  onStart,
+  onBack,
+}: {
+  source: RecorderSource;
+  labels: ReturnType<typeof useLabels>;
+  onStart: () => void;
+  onBack: () => void;
+}) {
+  const isBoth = source === "both";
+
+  const steps = isBoth
+    ? [
+        labels.meetStep1 ?? "פתחי את Google Meet בטאב נפרד ועברי לשיחה",
+        labels.meetStep2 ?? 'לחצי "התחל" — יפתח דיאלוג שיתוף מסך',
+        labels.meetStep3 ?? 'בחרי "טאב" (Tab) ובחרי את טאב ה-Meet',
+        labels.meetStep4 ?? '✅ סמני "שתף אודיו מהטאב" — זה חובה!',
+        labels.meetStep5 ?? 'לחצי "שתף" — ואז אפשרי גישה למיקרופון',
+      ]
+    : [
+        labels.meetStep1 ?? "פתחי את Google Meet בטאב נפרד ועברי לשיחה",
+        labels.meetStep2 ?? 'לחצי "התחל" — יפתח דיאלוג שיתוף מסך',
+        labels.meetStep3 ?? 'בחרי "טאב" (Tab) ובחרי את טאב ה-Meet',
+        labels.meetStep4 ?? '✅ סמני "שתף אודיו מהטאב" — זה חובה!',
+        labels.meetStep5Screen ?? 'לחצי "שתף"',
+      ];
+
+  return (
+    <div className="space-y-4">
+      <div className="rounded-lg border border-primary/30 bg-primary/5 p-4">
+        <div className="flex items-center gap-2 mb-3">
+          <svg className="w-4 h-4 text-primary shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <span className="text-sm font-medium text-primary">
+            {isBoth ? (labels.meetGuideTitleBoth ?? "איך להקליט פגישה + המיקרופון שלך") : (labels.meetGuideTitleScreen ?? "איך להקליט פגישה")}
+          </span>
+        </div>
+        <ol className="space-y-2">
+          {steps.map((step, i) => (
+            <li key={i} className="flex gap-2.5 text-sm">
+              <span className="shrink-0 w-5 h-5 rounded-full bg-primary/20 text-primary text-xs flex items-center justify-center font-bold">
+                {i + 1}
+              </span>
+              <span className="text-muted-foreground leading-relaxed">{step}</span>
+            </li>
+          ))}
+        </ol>
+        <div className="mt-3 p-2.5 rounded bg-yellow-500/10 border border-yellow-500/20 text-xs text-yellow-300">
+          {labels.meetAudioWarning ?? '⚠️ Chrome בלבד — Safari לא תומך בשיתוף אודיו. אם אין אופציית "שתף אודיו", בחרי "טאב" ולא "חלון".'}
+        </div>
+      </div>
+
+      <div className="flex gap-2">
+        <button
+          type="button"
+          onClick={onStart}
+          className="flex-1 rounded-lg py-2.5 bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/80 transition"
+        >
+          {labels.meetStartBtn ?? "הבנתי — התחל שיתוף מסך"}
+        </button>
+        <button
+          type="button"
+          onClick={onBack}
+          className="px-4 py-2.5 rounded-lg border border-border text-sm text-muted-foreground hover:text-foreground transition"
+        >
+          {labels.back ?? "←"}
+        </button>
+      </div>
+    </div>
+  );
 }

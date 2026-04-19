@@ -208,6 +208,18 @@ export interface UILabels {
   screenDenied: string;
   noSystemAudio: string;
 
+  // Meet guide
+  meetGuideTitleBoth: string;
+  meetGuideTitleScreen: string;
+  meetStep1: string;
+  meetStep2: string;
+  meetStep3: string;
+  meetStep4: string;
+  meetStep5: string;
+  meetStep5Screen: string;
+  meetAudioWarning: string;
+  meetStartBtn: string;
+
   // MP3 export
   downloadMp3: string;
   convertingMp3: string;
@@ -436,10 +448,22 @@ const LABELS: Record<string, UILabels> = {
     recordingScreen: "מקליט פגישה",
     recordingBoth: "מקליט פגישה + מיקרופון",
     screenDenied: "גישת שיתוף מסך נדחתה או בוטלה.",
-    noSystemAudio: "לא נמצא אודיו. סמן “שתף אודיו מהטאב” בדיאלוג השיתוף ונסה שוב.",
+    noSystemAudio: 'לא נמצא אודיו. סמן “שתף אודיו מהטאב” בדיאלוג השיתוף ונסה שוב.',
+
+    // Meet guide
+    meetGuideTitleBoth: 'איך להקליט פגישה + המיקרופון שלך',
+    meetGuideTitleScreen: 'איך להקליט פגישה',
+    meetStep1: 'פתחי את Google Meet בטאב נפרד והתחברי לשיחה',
+    meetStep2: 'לחצי “התחל” — יפתח דיאלוג שיתוף מסך',
+    meetStep3: 'בחרי “טאב” (Tab) ובחרי את טאב ה-Meet',
+    meetStep4: '\u2705 סמני “שתף אודיו מהטאב” — חובה!',
+    meetStep5: 'לחצי “שתף”, ואז אפשרי גישה למיקרופון',
+    meetStep5Screen: 'לחצי “שתף”',
+    meetAudioWarning: '\u26a0\ufe0f Chrome / Edge בלבד — Safari לא תומך. אם אין אופציית “שתף אודיו”, בחרי “טאב” ולא “חלון”.',
+    meetStartBtn: 'הבנתי — התחל שיתוף מסך',
 
     // MP3 export
-    downloadMp3: "הורד כ-MP3",
+    downloadMp3: 'הורד כ-MP3',
     convertingMp3: "ממיר ל-MP3...",
     mp3Failed: "המרה ל-MP3 נכשלה. נסה שוב.",
 
@@ -667,8 +691,20 @@ const LABELS: Record<string, UILabels> = {
     screenDenied: "Screen share was denied or cancelled.",
     noSystemAudio: "No audio captured. Tick \"Share tab audio\" in the share dialog and try again.",
 
+    // Meet guide
+    meetGuideTitleBoth: 'How to record a meeting + your microphone',
+    meetGuideTitleScreen: 'How to record a meeting',
+    meetStep1: 'Open Google Meet in a separate tab and join the call',
+    meetStep2: 'Click "Start" \u2014 a screen share dialog will open',
+    meetStep3: 'Choose "Tab" and select your Meet tab',
+    meetStep4: '\u2705 Check "Share tab audio" \u2014 this is required!',
+    meetStep5: 'Click "Share", then allow microphone access',
+    meetStep5Screen: 'Click "Share"',
+    meetAudioWarning: '\u26a0\ufe0f Chrome / Edge only \u2014 Safari doesn\'t support tab audio. If "Share audio" is missing, select "Tab" not "Window".',
+    meetStartBtn: 'Got it \u2014 start screen share',
+
     // MP3 export
-    downloadMp3: "Download as MP3",
+    downloadMp3: 'Download as MP3',
     convertingMp3: "Converting to MP3...",
     mp3Failed: "MP3 conversion failed. Please try again.",
 
@@ -894,12 +930,24 @@ const LABELS: Record<string, UILabels> = {
     recordingScreen: "רעקאָרדירט באַגעגעניש",
     recordingBoth: "רעקאָרדירט באַגעגעניש + מיקראָפֿאָן",
     screenDenied: "עקראַן-טיילן צוטריט אָפּגעזאָגט.",
-    noSystemAudio: "קיין אַודיאָ. קלויבט “שיין טאַב אַודיאָ” און פּרובירט נאָכאַמאָל.",
+    noSystemAudio: 'קיין אַודיאָ. קלויבט “שיין טאַב אַודיאָ” און פּרובירט נאָכאַמאָל.',
+
+    // Meet guide (Yiddish — fallback to English)
+    meetGuideTitleBoth: 'How to record a meeting + your microphone',
+    meetGuideTitleScreen: 'How to record a meeting',
+    meetStep1: 'Open Google Meet in a separate tab and join the call',
+    meetStep2: 'Click “Start” \u2014 a screen share dialog will open',
+    meetStep3: 'Choose “Tab” and select your Meet tab',
+    meetStep4: '\u2705 Check “Share tab audio” \u2014 this is required!',
+    meetStep5: 'Click “Share”, then allow microphone access',
+    meetStep5Screen: 'Click “Share”',
+    meetAudioWarning: '\u26a0\ufe0f Chrome / Edge only \u2014 Safari doesn\'t support tab audio.',
+    meetStartBtn: 'Got it \u2014 start screen share',
 
     // MP3 export
-    downloadMp3: "אַראָפּלאָדן ווי MP3",
-    convertingMp3: "מעוואַנדלט צו MP3...",
-    mp3Failed: "MP3 מעוואַנדלונג דורכגעפֿאַלן.",
+    downloadMp3: 'אַראָפּלאָדן ווי MP3',
+    convertingMp3: 'מעוואַנדלט צו MP3...',
+    mp3Failed: 'MP3 מעוואַנדלונג דורכגעפֿאַלן.',
 
     // File upload
     uploadAudioFile: "אַרויפֿלאָדן אַודיאָ טעקע",
