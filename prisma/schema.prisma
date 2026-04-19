@@ -60,26 +60,58 @@ enum ChatMessageRole {
 // ============================================================================
 
 model User {
-  id            String   @id @default(uuid()) @db.Uuid
-  email         String   @unique
-  name          String?
-  avatarUrl     String?
-  passwordHash  String?
-  emailVerified Boolean  @default(false)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id                      String    @id @default(uuid()) @db.Uuid
+  email                   String    @unique
+  name                    String?
+  avatarUrl               String?
+  passwordHash            String?
+  emailVerified           Boolean   @default(false)
+  passwordChangedAt       DateTime?
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
 
   googleAccessToken  String?
   googleRefreshToken String?
   googleEmail        String?
 
-  memberships   WorkspaceMember[]
-  conversations Conversation[]
-  chatMessages  ChatMessage[]
-  auditLogs     AuditLog[]
-  styleExamples StyleExample[]
+  memberships        WorkspaceMember[]
+  conversations      Conversation[]
+  chatMessages       ChatMessage[]
+  auditLogs          AuditLog[]
+  styleExamples      StyleExample[]
+  verificationTokens EmailVerificationToken[]
+  passwordResetTokens PasswordResetToken[]
 
   @@map("users")
+}
+
+model EmailVerificationToken {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @db.Uuid
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("email_verification_tokens")
+}
+
+model PasswordResetToken {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @db.Uuid
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  ipAddress String?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("password_reset_tokens")
 }
 
 model Workspace {

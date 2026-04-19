@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
+import crypto from "crypto";
 import { hash } from "bcryptjs";
 import { db } from "@/lib/db";
 import { registerSchema } from "@/lib/validations/auth";
 import { rateLimit } from "@/lib/rate-limit";
 import { Prisma } from "@prisma/client";
+import { sendEmail, buildVerificationEmail } from "@/services/email";
 
 export async function POST(req: NextRequest) {
   const limited = await rateLimit(req, "register");
@@ -63,6 +65,24 @@ export async function POST(req: NextRequest) {
 
       return { user, workspace };
     });
+
+    // Send verification email (fire-and-forget, don't block registration)
+    const raw = crypto.randomBytes(32).toString("hex");
+    const tokenHash = crypto.createHash("sha256").update(raw).digest("hex");
+    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+
+    db.emailVerificationToken
+      .create({ data: { userId: result.user.id, tokenHash, expiresAt } })
+      .then(() => {
+        const baseUrl = process.env.AUTH_URL || process.env.NEXTAUTH_URL || "http://localhost:3000";
+        const link = `${baseUrl}/api/auth/verify-email?token=${raw}`;
+        return sendEmail({
+          to: result.user.email,
+          subject: "Briefly — אמתי את כתובת המייל שלך",
+          html: buildVerificationEmail(link),
+        });
+      })
+      .catch((err) => console.error("Verification email failed:", err));
 
     return NextResponse.json(
       {

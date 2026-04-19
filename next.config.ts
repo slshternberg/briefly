@@ -6,19 +6,6 @@ const nextConfig: NextConfig = {
       bodySizeLimit: "100mb",
     },
   },
-  async headers() {
-    return [
-      {
-        source: "/(.*)",
-        headers: [
-          {
-            key: "Permissions-Policy",
-            value: "microphone=self, camera=self, display-capture=self",
-          },
-        ],
-      },
-    ];
-  },
 };
 
 export default nextConfig;

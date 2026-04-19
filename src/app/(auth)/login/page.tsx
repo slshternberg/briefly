@@ -4,6 +4,7 @@ import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { signIn } from "next-auth/react";
+
 import { useLabels } from "@/lib/client-language";
 
 function LoginForm() {
@@ -14,6 +15,9 @@ function LoginForm() {
   const [loading, setLoading] = useState(false);
 
   const justRegistered = searchParams.get("registered") === "true";
+  const justVerified = searchParams.get("verified") === "true";
+  const verifyError = searchParams.get("verifyError") === "true";
+  const justReset = searchParams.get("reset") === "true";
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -58,6 +62,40 @@ function LoginForm() {
         </div>
       )}
 
+      {justVerified && (
+        <div className="mb-4 rounded-lg bg-green-500/10 border border-green-500/20 p-3 text-sm text-green-400">
+          המייל אומת בהצלחה! כעת ניתן להתחבר.
+        </div>
+      )}
+
+      {justReset && (
+        <div className="mb-4 rounded-lg bg-green-500/10 border border-green-500/20 p-3 text-sm text-green-400">
+          הסיסמה עודכנה בהצלחה! כעת ניתן להתחבר.
+        </div>
+      )}
+
+      {verifyError && (
+        <div className="mb-4 rounded-lg bg-destructive/10 border border-destructive/20 p-3 text-sm text-destructive">
+          קישור האימות פג תוקף או אינו תקין.{" "}
+          <button
+            type="button"
+            className="underline"
+            onClick={() => {
+              const email = (document.querySelector('input[name="email"]') as HTMLInputElement)?.value;
+              if (email) {
+                fetch("/api/auth/resend-verification", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ email }),
+                });
+              }
+            }}
+          >
+            שלחי קישור חדש
+          </button>
+        </div>
+      )}
+
       {error && (
         <div className="mb-4 rounded-lg bg-destructive/10 border border-destructive/20 p-3 text-sm text-destructive">
           {error}
@@ -80,9 +118,14 @@ function LoginForm() {
         </div>
 
         <div>
-          <label htmlFor="password" className="block text-sm font-medium mb-1.5 text-muted-foreground">
-            {labels.passwordLabel}
-          </label>
+          <div className="flex items-center justify-between mb-1.5">
+            <label htmlFor="password" className="block text-sm font-medium text-muted-foreground">
+              {labels.passwordLabel}
+            </label>
+            <Link href="/forgot-password" className="text-xs text-primary hover:text-primary/80 transition">
+              שכחתי סיסמה
+            </Link>
+          </div>
           <input
             id="password"
             name="password"

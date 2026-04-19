@@ -31,6 +31,12 @@ const uploadLimiter = new RateLimiterMemory({
   duration: 60 * 60,
 });
 
+// Password reset / email verify: max 3 per hour per IP
+const passwordResetLimiter = new RateLimiterMemory({
+  points: 3,
+  duration: 60 * 60,
+});
+
 function getIP(req: NextRequest): string {
   return (
     req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
@@ -41,9 +47,12 @@ function getIP(req: NextRequest): string {
 
 export async function rateLimit(
   req: NextRequest,
-  type: "register" | "login"
+  type: "register" | "login" | "passwordReset"
 ): Promise<NextResponse | null> {
-  const limiter = type === "register" ? registerLimiter : loginLimiter;
+  const limiter =
+    type === "register" ? registerLimiter :
+    type === "passwordReset" ? passwordResetLimiter :
+    loginLimiter;
   const ip = getIP(req);
 
   try {
