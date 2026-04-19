@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { getStorageProvider } from "@/services/storage";
+import { logAudit } from "@/lib/audit";
 
 export async function PATCH(
   req: Request,
@@ -77,6 +78,14 @@ export async function DELETE(
     await db.conversation.update({
       where: { id: conversationId },
       data: { deletedAt: new Date() },
+    });
+
+    logAudit({
+      workspaceId,
+      userId: session.user.id,
+      action: "conversation.delete",
+      targetType: "conversation",
+      targetId: conversationId,
     });
 
     return NextResponse.json({ success: true });

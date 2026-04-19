@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import { loginSchema } from "@/lib/validations/auth";
 import { WorkspaceMemberRole } from "@prisma/client";
 import { RateLimiterMemory } from "rate-limiter-flexible";
+import { logAudit } from "@/lib/audit";
 
 const loginLimiter = new RateLimiterMemory({ points: 10, duration: 60 * 15 });
 
@@ -55,6 +56,13 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
 
         if (!activeMembership) return null;
 
+        // Audit: successful login
+        logAudit({
+          workspaceId: activeMembership.workspaceId,
+          userId: user.id,
+          action: "user.login",
+        });
+
         return {
           id: user.id,
           email: user.email,
@@ -94,6 +102,18 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           .activeWorkspaceId as string;
         token.activeWorkspaceRole = (user as Record<string, unknown>)
           .activeWorkspaceRole as string;
+      } else if (token.id) {
+        // Subsequent requests: check if password was reset after this token was issued
+        const dbUser = await db.user.findUnique({
+          where: { id: token.id as string },
+          select: { passwordChangedAt: true },
+        });
+        if (dbUser?.passwordChangedAt) {
+          const tokenIat = (token.iat as number) * 1000; // seconds → ms
+          if (dbUser.passwordChangedAt.getTime() > tokenIat) {
+            return null as never; // Force re-login
+          }
+        }
       }
       return token;
     },

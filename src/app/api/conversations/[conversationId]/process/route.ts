@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { rateLimitUser } from "@/lib/rate-limit";
 import { checkConversationLimit, incrementConversationUsage } from "@/lib/billing";
+import { logAudit } from "@/lib/audit";
 import { getStorageProvider } from "@/services/storage";
 import { analyzeConversationAudio } from "@/services/gemini";
 import { getActiveStyleProfile } from "@/services/style";
@@ -210,6 +211,16 @@ export async function POST(
         data: { status: "COMPLETED", language: outputLanguage },
       }),
     ]);
+
+    // Audit log
+    logAudit({
+      workspaceId,
+      userId: session.user.id,
+      action: "conversation.process",
+      targetType: "conversation",
+      targetId: conversationId,
+      metadata: { modelUsed: result.modelUsed, outputLanguage },
+    });
 
     // Increment usage record (fire-and-forget)
     incrementConversationUsage(workspaceId, asset.durationSeconds ?? 0).catch(

@@ -6,6 +6,7 @@ import { registerSchema } from "@/lib/validations/auth";
 import { rateLimit } from "@/lib/rate-limit";
 import { Prisma } from "@prisma/client";
 import { sendEmail, buildVerificationEmail } from "@/services/email";
+import { logAudit } from "@/lib/audit";
 
 export async function POST(req: NextRequest) {
   const limited = await rateLimit(req, "register");
@@ -64,6 +65,12 @@ export async function POST(req: NextRequest) {
       });
 
       return { user, workspace };
+    });
+
+    logAudit({
+      workspaceId: result.workspace.id,
+      userId: result.user.id,
+      action: "user.register",
     });
 
     // Send verification email (fire-and-forget, don't block registration)

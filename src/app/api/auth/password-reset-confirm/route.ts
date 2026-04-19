@@ -3,6 +3,7 @@ import crypto from "crypto";
 import { hash } from "bcryptjs";
 import { db } from "@/lib/db";
 import { z } from "zod";
+import { logAudit } from "@/lib/audit";
 
 const schema = z.object({
   token: z.string().min(1),
@@ -32,16 +33,27 @@ export async function POST(req: NextRequest) {
   const passwordHash = await hash(password, 12);
   const now = new Date();
 
-  await db.$transaction([
+  const [updatedUser] = await db.$transaction([
     db.user.update({
       where: { id: record.userId },
       data: { passwordHash, passwordChangedAt: now },
+      include: { memberships: { where: { role: "OWNER" }, take: 1, select: { workspaceId: true } } },
     }),
     db.passwordResetToken.update({
       where: { id: record.id },
       data: { usedAt: now },
     }),
   ]);
+
+  const workspaceId = updatedUser.memberships[0]?.workspaceId;
+  if (workspaceId) {
+    logAudit({
+      workspaceId,
+      userId: record.userId,
+      action: "user.password_reset",
+      ipAddress: req.headers.get("x-forwarded-for")?.split(",")[0]?.trim(),
+    });
+  }
 
   return NextResponse.json({ ok: true });
 }
