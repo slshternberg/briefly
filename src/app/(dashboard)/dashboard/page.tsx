@@ -3,6 +3,7 @@ import { listConversations } from "@/services/conversation";
 import Link from "next/link";
 import { ConversationList } from "@/components/conversations/conversation-list";
 import { getLabels, isRTL } from "@/lib/ui-labels";
+import { db } from "@/lib/db";
 
 export default async function DashboardPage() {
   const { workspace } = await requireAuth();
@@ -10,9 +11,14 @@ export default async function DashboardPage() {
   const lang = workspace.defaultLanguage || "English";
   const labels = getLabels(lang);
 
-  const conversations = await listConversations({
-    workspaceId: workspace.id,
-  });
+  const periodStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+
+  const [conversations, usage] = await Promise.all([
+    listConversations({ workspaceId: workspace.id }),
+    db.usageRecord.findFirst({
+      where: { workspaceId: workspace.id, periodStart },
+    }),
+  ]);
 
   const serialized = conversations.map((c) => ({
     id: c.id,
@@ -92,15 +98,15 @@ export default async function DashboardPage() {
         <div className="mt-4 grid grid-cols-3 gap-4 text-sm">
           <div>
             <div className="text-muted-foreground">{labels.conversationsUsage}</div>
-            <div className="font-medium mt-0.5">{conversations.length} / 10</div>
+            <div className="font-medium mt-0.5">{usage?.conversationCount ?? 0} / 10</div>
           </div>
           <div>
             <div className="text-muted-foreground">{labels.audioMinutes}</div>
-            <div className="font-medium mt-0.5">0 / 60</div>
+            <div className="font-medium mt-0.5">{Math.round((usage?.audioSecondsUsed ?? 0) / 60)} / 120</div>
           </div>
           <div>
             <div className="text-muted-foreground">{labels.aiQueries}</div>
-            <div className="font-medium mt-0.5">0 / 50</div>
+            <div className="font-medium mt-0.5">{usage?.aiQueryCount ?? 0} / 50</div>
           </div>
         </div>
       </div>
