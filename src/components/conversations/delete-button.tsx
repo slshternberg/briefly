@@ -13,9 +13,11 @@ export function DeleteButton({ conversationId }: DeleteButtonProps) {
   const labels = useLabels();
   const [confirming, setConfirming] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState(false);
 
   async function handleDelete() {
     setDeleting(true);
+    setDeleteError(false);
     try {
       const res = await fetch(`/api/conversations/${conversationId}`, {
         method: "DELETE",
@@ -24,15 +26,24 @@ export function DeleteButton({ conversationId }: DeleteButtonProps) {
       if (!res.ok) {
         setDeleting(false);
         setConfirming(false);
+        setDeleteError(true);
         return;
       }
 
       router.push("/dashboard");
       router.refresh();
-    } catch {
+    } catch (err) {
+      console.error("Failed to delete conversation:", err);
       setDeleting(false);
       setConfirming(false);
+      setDeleteError(true);
     }
+  }
+
+  if (deleteError) {
+    return (
+      <span className="text-xs text-destructive">{labels.deleteFailed ?? "Delete failed"}</span>
+    );
   }
 
   if (confirming) {

@@ -13,6 +13,24 @@ const loginLimiter = new RateLimiterMemory({
   duration: 60 * 15, // 15 minutes
 });
 
+// Process (Gemini analysis): max 20 per hour per user
+const processLimiter = new RateLimiterMemory({
+  points: 20,
+  duration: 60 * 60,
+});
+
+// Chat: max 60 per hour per user
+const chatLimiter = new RateLimiterMemory({
+  points: 60,
+  duration: 60 * 60,
+});
+
+// Upload: max 30 per hour per user
+const uploadLimiter = new RateLimiterMemory({
+  points: 30,
+  duration: 60 * 60,
+});
+
 function getIP(req: NextRequest): string {
   return (
     req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
@@ -38,6 +56,26 @@ export async function rateLimit(
         status: 429,
         headers: { "Retry-After": "900" },
       }
+    );
+  }
+}
+
+export async function rateLimitUser(
+  userId: string,
+  type: "process" | "chat" | "upload"
+): Promise<NextResponse | null> {
+  const limiter =
+    type === "process" ? processLimiter :
+    type === "upload" ? uploadLimiter :
+    chatLimiter;
+
+  try {
+    await limiter.consume(userId);
+    return null; // allowed
+  } catch {
+    return NextResponse.json(
+      { error: "TOO_MANY_REQUESTS" },
+      { status: 429, headers: { "Retry-After": "3600" } }
     );
   }
 }

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { rateLimitUser } from "@/lib/rate-limit";
 import { chatWithConversation } from "@/services/gemini";
 import { buildConversationChatPrompt } from "@/services/ai/prompts";
 import type { ConversationAnalysis } from "@/services/gemini/schema";
@@ -23,6 +24,10 @@ export async function POST(
 
     const workspaceId = session.user.activeWorkspaceId;
     const userId = session.user.id;
+
+    // Rate limit: max 60 chat calls per hour per user
+    const limited = await rateLimitUser(userId, "chat");
+    if (limited) return limited;
 
     // 2. Parse body
     let question: string;

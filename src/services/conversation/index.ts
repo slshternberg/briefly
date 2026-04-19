@@ -3,16 +3,21 @@ import { getStorageProvider } from "@/services/storage";
 import { AssetSourceType } from "@prisma/client";
 
 const ALLOWED_MIME_TYPES = [
+  // Audio
   "audio/mpeg",      // mp3
+  "audio/mp3",       // mp3 (alt)
   "audio/wav",       // wav
   "audio/x-wav",     // wav (alt)
   "audio/mp4",       // m4a
   "audio/x-m4a",     // m4a (alt)
   "audio/webm",      // webm
   "audio/ogg",       // ogg
+  // Video (screen recordings — Gemini supports these)
+  "video/webm",
+  "video/mp4",
 ];
 
-const MAX_FILE_SIZE = 100 * 1024 * 1024; // 100MB
+const MAX_FILE_SIZE = 500 * 1024 * 1024; // 500MB (video meetings can be large)
 
 export function isAllowedMimeType(mimeType: string): boolean {
   // Strip codec parameters (e.g. "audio/webm;codecs=opus" → "audio/webm")

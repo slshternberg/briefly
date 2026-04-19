@@ -33,8 +33,10 @@ export class LocalStorageProvider implements StorageProvider {
 
   async deleteFile(storagePath: string): Promise<void> {
     const fullPath = path.join(UPLOAD_ROOT, storagePath);
-    await fs.unlink(fullPath).catch(() => {
-      // File may already be deleted — ignore
+    await fs.unlink(fullPath).catch((err) => {
+      if (err.code !== "ENOENT") {
+        console.error(`Failed to delete file ${storagePath}:`, err);
+      }
     });
   }
 

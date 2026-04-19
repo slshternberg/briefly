@@ -52,10 +52,14 @@ export async function POST(
 
   oauth2Client.on("tokens", async (tokens) => {
     if (tokens.access_token) {
-      await db.user.update({
-        where: { id: session.user.id },
-        data: { googleAccessToken: tokens.access_token },
-      });
+      try {
+        await db.user.update({
+          where: { id: session.user.id },
+          data: { googleAccessToken: tokens.access_token },
+        });
+      } catch (err) {
+        console.error("Failed to persist refreshed OAuth token:", err);
+      }
     }
   });
 

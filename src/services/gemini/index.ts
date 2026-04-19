@@ -52,7 +52,7 @@ async function withModelFallback<T>(
     return { result, modelUsed: PRIMARY_MODEL };
   } catch (error) {
     if (!isRetriableError(error)) throw error;
-    console.log(`Gemini primary model overloaded → switching to ${FALLBACK_MODEL}`);
+    console.warn(`Gemini primary model overloaded → switching to ${FALLBACK_MODEL}`);
   }
 
   // Fallback model — one retry with delay if also overloaded
@@ -62,7 +62,7 @@ async function withModelFallback<T>(
       return { result, modelUsed: FALLBACK_MODEL };
     } catch (error) {
       if (!isRetriableError(error) || attempt === 1) throw error;
-      console.log(`Fallback model overloaded — waiting 10s before retry...`);
+      console.warn(`Fallback model overloaded — waiting 10s before retry...`);
       await new Promise((resolve) => setTimeout(resolve, 10000));
     }
   }
@@ -332,7 +332,9 @@ ${params.customPrompt}`;
   }
 
   // Step: Clean up uploaded file (best-effort, AFTER both calls)
-  ai.files.delete({ name: fileName }).catch(() => {});
+  ai.files.delete({ name: fileName }).catch((err) => {
+    console.warn(`Failed to clean up Gemini file ${fileName}:`, err);
+  });
 
   return {
     analysis,

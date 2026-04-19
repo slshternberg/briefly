@@ -7,6 +7,7 @@ import {
   uploadAudioAsset,
 } from "@/services/conversation";
 import { AssetSourceType } from "@prisma/client";
+import { rateLimitUser } from "@/lib/rate-limit";
 
 export async function POST(
   req: Request,
@@ -17,6 +18,9 @@ export async function POST(
     if (!session?.user?.id || !session.user.activeWorkspaceId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    const limited = await rateLimitUser(session.user.id, "upload");
+    if (limited) return limited;
 
     const { conversationId } = await params;
     const workspaceId = session.user.activeWorkspaceId;
@@ -53,20 +57,26 @@ export async function POST(
         m4a: "audio/mp4",
         webm: "audio/webm",
         ogg: "audio/ogg",
+        mp4: "video/mp4",
       };
       mimeType = (ext && extMap[ext]) || "";
     }
 
+    // Screen recordings often come as video/webm — convert to that explicitly
+    if (mimeType === "audio/webm" && file.name.toLowerCase().endsWith(".webm")) {
+      // Keep as audio/webm — the recorder marks video explicitly
+    }
+
     if (!isAllowedMimeType(mimeType)) {
       return NextResponse.json(
-        { error: "Invalid file type. Allowed: mp3, wav, m4a, webm, ogg" },
+        { error: "Invalid file type. Allowed: mp3, wav, m4a, webm, ogg, mp4 (video)" },
         { status: 400 }
       );
     }
 
     if (!isAllowedFileSize(file.size)) {
       return NextResponse.json(
-        { error: "File too large. Maximum size is 100MB" },
+        { error: "File too large. Maximum size is 500MB" },
         { status: 400 }
       );
     }

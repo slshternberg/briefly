@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { rateLimitUser } from "@/lib/rate-limit";
 import { getStorageProvider } from "@/services/storage";
 import { analyzeConversationAudio } from "@/services/gemini";
 import { getActiveStyleProfile } from "@/services/style";
@@ -20,6 +21,10 @@ export async function POST(
     }
 
     const workspaceId = session.user.activeWorkspaceId;
+
+    // Rate limit: max 20 process calls per hour per user
+    const limited = await rateLimitUser(session.user.id, "process");
+    if (limited) return limited;
 
     // 2. Read request body
     let outputLanguage = "Hebrew";
@@ -207,6 +212,8 @@ export async function POST(
         conversationId,
         conversationTitle: conversation.title,
         baseUrl,
+      }).catch((err) => {
+        console.error("Failed to send analysis complete notification:", err);
       });
     }
 

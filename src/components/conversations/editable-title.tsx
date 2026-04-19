@@ -38,8 +38,8 @@ export function EditableTitle({ conversationId, initialTitle }: EditableTitlePro
       if (res.ok) {
         setTitle(trimmed);
       }
-    } catch {
-      // Silently fail
+    } catch (err) {
+      console.error("Failed to save title:", err);
     }
     setEditing(false);
   }

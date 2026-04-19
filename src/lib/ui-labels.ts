@@ -175,6 +175,7 @@ export interface UILabels {
   deleteConversation: string;
   confirmDelete: string;
   yes: string;
+  deleteFailed: string;
 
   // Audio recorder
   recordAudioTitle: string;
@@ -184,7 +185,33 @@ export interface UILabels {
   recordingComplete: string;
   recordAgain: string;
   micDenied: string;
+  micNotFound: string;
+  micInUse: string;
   micError: string;
+  requestingMic: string;
+  pause: string;
+  recordingPaused: string;
+  resume: string;
+  tryAgain: string;
+
+  // Source picker
+  sourceMicTitle: string;
+  sourceMicDesc: string;
+  sourceScreenTitle: string;
+  sourceScreenDesc: string;
+  sourceBothTitle: string;
+  sourceBothDesc: string;
+  screenAudioHint: string;
+  requestingScreen: string;
+  recordingScreen: string;
+  recordingBoth: string;
+  screenDenied: string;
+  noSystemAudio: string;
+
+  // MP3 export
+  downloadMp3: string;
+  convertingMp3: string;
+  mp3Failed: string;
 
   // File upload
   uploadAudioFile: string;
@@ -378,6 +405,7 @@ const LABELS: Record<string, UILabels> = {
     deleteConversation: "מחק שיחה",
     confirmDelete: "האם אתה בטוח שברצונך למחוק שיחה זו? פעולה זו אינה הפיכה.",
     yes: "כן",
+    deleteFailed: "מחיקה נכשלה. נסה שוב.",
 
     // Audio recorder
     recordAudioTitle: "הקלטת אודיו",
@@ -386,8 +414,34 @@ const LABELS: Record<string, UILabels> = {
     stop: "עצור",
     recordingComplete: "ההקלטה הושלמה",
     recordAgain: "הקלט שוב",
-    micDenied: "הגישה למיקרופון נדחתה. אנא אפשר גישה למיקרופון.",
+    micDenied: "הגישה למיקרופון נדחתה. אנא אפשר גישה בהגדרות הדפדפן.",
+    micNotFound: "לא נמצא מיקרופון. חבר מיקרופון ונסה שוב.",
+    micInUse: "המיקרופון בשימוש על ידי אפליקציה אחרת.",
     micError: "לא ניתן להתחיל הקלטה. בדוק את המיקרופון שלך.",
+    requestingMic: "מבקש גישה למיקרופון...",
+    pause: "השהה",
+    recordingPaused: "מושהה",
+    resume: "המשך",
+    tryAgain: "נסה שוב",
+
+    // Source picker
+    sourceMicTitle: "מיקרופון בלבד",
+    sourceMicDesc: "הקלטת הקול שלך בלבד (לתזכיר אישי וכו׳)",
+    sourceScreenTitle: "פגישה על המחשב",
+    sourceScreenDesc: "שתף טאב/חלון של Zoom, Meet או Teams — נקלט כולל אודיו של כל המשתתפים",
+    sourceBothTitle: "פגישה + המיקרופון שלך",
+    sourceBothDesc: "אודיו מערכת + הקול שלך יחד — הכי טוב להקלטת פגישות שאתה משתתף בהן",
+    screenAudioHint: "לפגישות: סמן “שתף אודיו מהטאב” בדיאלוג של הדפדפן. זמין ב-Chrome / Edge.",
+    requestingScreen: "מבקש גישה למסך...",
+    recordingScreen: "מקליט פגישה",
+    recordingBoth: "מקליט פגישה + מיקרופון",
+    screenDenied: "גישת שיתוף מסך נדחתה או בוטלה.",
+    noSystemAudio: "לא נמצא אודיו. סמן “שתף אודיו מהטאב” בדיאלוג השיתוף ונסה שוב.",
+
+    // MP3 export
+    downloadMp3: "הורד כ-MP3",
+    convertingMp3: "ממיר ל-MP3...",
+    mp3Failed: "המרה ל-MP3 נכשלה. נסה שוב.",
 
     // File upload
     uploadAudioFile: "העלאת קובץ אודיו",
@@ -580,6 +634,7 @@ const LABELS: Record<string, UILabels> = {
     deleteConversation: "Delete",
     confirmDelete: "Are you sure you want to delete this conversation? This action cannot be undone.",
     yes: "Yes",
+    deleteFailed: "Delete failed. Please try again.",
 
     // Audio recorder
     recordAudioTitle: "Record Audio",
@@ -588,8 +643,34 @@ const LABELS: Record<string, UILabels> = {
     stop: "Stop",
     recordingComplete: "Recording complete",
     recordAgain: "Record again",
-    micDenied: "Microphone access denied. Please allow microphone access.",
+    micDenied: "Microphone access denied. Please allow access in your browser settings.",
+    micNotFound: "No microphone found. Connect a microphone and try again.",
+    micInUse: "Microphone is in use by another application.",
     micError: "Could not start recording. Check your microphone.",
+    requestingMic: "Requesting microphone access...",
+    pause: "Pause",
+    recordingPaused: "Paused",
+    resume: "Resume",
+    tryAgain: "Try again",
+
+    // Source picker
+    sourceMicTitle: "Microphone only",
+    sourceMicDesc: "Record just your voice (memos, notes, etc.)",
+    sourceScreenTitle: "Live meeting on this computer",
+    sourceScreenDesc: "Share a Zoom, Meet, or Teams tab/window — captures all participants",
+    sourceBothTitle: "Meeting + your microphone",
+    sourceBothDesc: "System audio mixed with your mic — best for meetings you're actively in",
+    screenAudioHint: "Meetings: in the share dialog, tick \"Share tab audio\". Works in Chrome / Edge.",
+    requestingScreen: "Requesting screen access...",
+    recordingScreen: "Recording meeting",
+    recordingBoth: "Recording meeting + mic",
+    screenDenied: "Screen share was denied or cancelled.",
+    noSystemAudio: "No audio captured. Tick \"Share tab audio\" in the share dialog and try again.",
+
+    // MP3 export
+    downloadMp3: "Download as MP3",
+    convertingMp3: "Converting to MP3...",
+    mp3Failed: "MP3 conversion failed. Please try again.",
 
     // File upload
     uploadAudioFile: "Upload Audio File",
@@ -782,6 +863,7 @@ const LABELS: Record<string, UILabels> = {
     deleteConversation: "אויסמעקן",
     confirmDelete: "צי זענט איר זיכער? דאָס קען נישט צוריקגענומען ווערן.",
     yes: "יאָ",
+    deleteFailed: "אויסמעקן דורכגעפֿאַלן. פּרובירט נאָכאַמאָל.",
 
     // Audio recorder
     recordAudioTitle: "רעקאָרדירן אַודיאָ",
@@ -791,7 +873,33 @@ const LABELS: Record<string, UILabels> = {
     recordingComplete: "רעקאָרדירונג פֿאַרענדיקט",
     recordAgain: "רעקאָרדירן נאָכאַמאָל",
     micDenied: "מיקראָפֿאָן צוטריט אָפּגעזאָגט.",
+    micNotFound: "קיין מיקראָפֿאָן נישט געפֿונען.",
+    micInUse: "מיקראָפֿאָן איז אין נוצ.",
     micError: "קען נישט אָנהייבן רעקאָרדירן.",
+    requestingMic: "בעט מיקראָפֿאָן צוטריט...",
+    pause: "פּויזע",
+    recordingPaused: "פּויזירט",
+    resume: "פֿאָרזעצן",
+    tryAgain: "פּרובירן נאָכאַמאָל",
+
+    // Source picker
+    sourceMicTitle: "נאָר מיקראָפֿאָן",
+    sourceMicDesc: "רעקאָרדירן נאָר דײַן קול",
+    sourceScreenTitle: "לעבעדיקע באַגעגעניש",
+    sourceScreenDesc: "טיילט Zoom / Meet / Teams טאַב",
+    sourceBothTitle: "באַגעגעניש + מיקראָפֿאָן",
+    sourceBothDesc: "סיסטעם אַודיאָ מיט דײַן קול",
+    screenAudioHint: "פֿאַר באַגעגענישן: קלויבט “שיין טאַב אַודיאָ” אין דעם טייל-דיאַלאָג. Chrome / Edge.",
+    requestingScreen: "בעט עקראַן צוטריט...",
+    recordingScreen: "רעקאָרדירט באַגעגעניש",
+    recordingBoth: "רעקאָרדירט באַגעגעניש + מיקראָפֿאָן",
+    screenDenied: "עקראַן-טיילן צוטריט אָפּגעזאָגט.",
+    noSystemAudio: "קיין אַודיאָ. קלויבט “שיין טאַב אַודיאָ” און פּרובירט נאָכאַמאָל.",
+
+    // MP3 export
+    downloadMp3: "אַראָפּלאָדן ווי MP3",
+    convertingMp3: "מעוואַנדלט צו MP3...",
+    mp3Failed: "MP3 מעוואַנדלונג דורכגעפֿאַלן.",
 
     // File upload
     uploadAudioFile: "אַרויפֿלאָדן אַודיאָ טעקע",
