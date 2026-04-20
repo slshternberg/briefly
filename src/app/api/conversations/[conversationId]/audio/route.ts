@@ -4,7 +4,7 @@ import { db } from "@/lib/db";
 import { getStorageProvider } from "@/services/storage";
 
 export async function GET(
-  _req: Request,
+  req: Request,
   { params }: { params: Promise<{ conversationId: string }> }
 ) {
   try {
@@ -16,38 +16,51 @@ export async function GET(
     const { conversationId } = await params;
     const workspaceId = session.user.activeWorkspaceId;
 
-    // Get the latest asset for this conversation, scoped to workspace
     const asset = await db.conversationAsset.findFirst({
-      where: {
-        conversationId,
-        workspaceId,
-        uploadStatus: "COMPLETED",
-      },
+      where: { conversationId, workspaceId, uploadStatus: "COMPLETED" },
       orderBy: { createdAt: "desc" },
     });
 
     if (!asset) {
-      return NextResponse.json(
-        { error: "Audio not found" },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: "Audio not found" }, { status: 404 });
     }
 
     const storage = getStorageProvider();
     const buffer = await storage.getFileBuffer(asset.storagePath);
+    const totalSize = buffer.length;
+
+    const rangeHeader = req.headers.get("range");
+
+    if (rangeHeader) {
+      const match = rangeHeader.match(/bytes=(\d+)-(\d*)/);
+      if (match) {
+        const start = parseInt(match[1], 10);
+        const end = match[2] ? Math.min(parseInt(match[2], 10), totalSize - 1) : totalSize - 1;
+        const chunkSize = end - start + 1;
+
+        return new Response(new Uint8Array(buffer.subarray(start, end + 1)), {
+          status: 206,
+          headers: {
+            "Content-Type": asset.mimeType,
+            "Content-Range": `bytes ${start}-${end}/${totalSize}`,
+            "Accept-Ranges": "bytes",
+            "Content-Length": chunkSize.toString(),
+            "Cache-Control": "private, max-age=3600",
+          },
+        });
+      }
+    }
 
     return new Response(new Uint8Array(buffer), {
       headers: {
         "Content-Type": asset.mimeType,
-        "Content-Length": buffer.length.toString(),
+        "Content-Length": totalSize.toString(),
+        "Accept-Ranges": "bytes",
         "Cache-Control": "private, max-age=3600",
       },
     });
   } catch (error) {
     console.error("Audio serve error:", error);
-    return NextResponse.json(
-      { error: "Failed to load audio" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Failed to load audio" }, { status: 500 });
   }
 }
