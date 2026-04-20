@@ -160,10 +160,8 @@ export function useRecorder(maxSeconds = 7200): UseRecorderReturn {
 
     audioContextRef.current = ctx;
 
-    const mixedStream = new MediaStream([
-      ...displayStream.getVideoTracks(),
-      ...dest.stream.getAudioTracks(),
-    ]);
+    // Audio-only — video track is not needed for analysis and makes files huge
+    const mixedStream = new MediaStream([...dest.stream.getAudioTracks()]);
 
     // Keep originals alive so we can stop them on cleanup
     tracksRef.current.push(
@@ -173,7 +171,7 @@ export function useRecorder(maxSeconds = 7200): UseRecorderReturn {
 
     return {
       stream: mixedStream,
-      hasVideo: true,
+      hasVideo: false,
       visualisationStream: dest.stream,
     };
   }
