@@ -47,6 +47,22 @@ export function buildVerificationEmail(link: string): string {
 </html>`;
 }
 
+export function buildInvitationEmail(workspaceName: string, inviterName: string, link: string): string {
+  return `<!DOCTYPE html>
+<html dir="rtl" lang="he">
+<body style="font-family:Arial,sans-serif;font-size:14px;line-height:1.8;color:#222;max-width:600px;margin:0 auto;padding:24px;direction:rtl;text-align:right;">
+  <h2 style="margin-top:0;color:#111;">הוזמנת להצטרף ל-${workspaceName}</h2>
+  <p>${inviterName} מזמין אותך להצטרף לסביבת העבודה <strong>${workspaceName}</strong> ב-Briefly.</p>
+  <p>
+    <a href="${link}" style="display:inline-block;background:#f97316;color:#fff;padding:10px 24px;border-radius:8px;text-decoration:none;font-weight:bold;">
+      קבלת ההזמנה
+    </a>
+  </p>
+  <p style="color:#888;font-size:12px;">הקישור תקף ל-48 שעות. אם לא ביקשת זאת, ניתן להתעלם מהודעה זו.</p>
+</body>
+</html>`;
+}
+
 export function buildPasswordResetEmail(link: string): string {
   return `<!DOCTYPE html>
 <html dir="rtl" lang="he">

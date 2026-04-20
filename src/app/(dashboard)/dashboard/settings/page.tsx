@@ -6,11 +6,12 @@ import { CustomInstructions } from "@/components/settings/custom-instructions";
 import { StyleExamples } from "@/components/settings/style-examples";
 import { GoogleConnectButton } from "@/components/settings/google-connect-button";
 import { DeleteAccount } from "@/components/settings/delete-account";
+import { InviteMember } from "@/components/settings/invite-member";
 
 export default async function SettingsPage() {
   const { session, workspace, role } = await requireAuth();
 
-  const [ws, user] = await Promise.all([
+  const [ws, user, members] = await Promise.all([
     db.workspace.findUnique({
       where: { id: workspace.id },
       select: { defaultLanguage: true, customInstructions: true },
@@ -18,6 +19,11 @@ export default async function SettingsPage() {
     db.user.findUnique({
       where: { id: session.user.id },
       select: { googleEmail: true, email: true },
+    }),
+    db.workspaceMember.findMany({
+      where: { workspaceId: workspace.id },
+      include: { user: { select: { name: true, email: true } } },
+      orderBy: { createdAt: "asc" },
     }),
   ]);
 
@@ -62,6 +68,14 @@ export default async function SettingsPage() {
             {labels.styleLearnDesc}
           </p>
           <StyleExamples canEdit={canEdit} />
+        </div>
+
+        <div className="rounded-xl border border-border bg-card/60 p-6">
+          <h2 className="font-semibold mb-1">חברי הצוות</h2>
+          <p className="text-xs text-muted-foreground mb-4">
+            ניהול חברי סביבת העבודה והזמנת משתמשים חדשים.
+          </p>
+          <InviteMember members={members} canInvite={canEdit} />
         </div>
 
         <div className="rounded-xl border border-border bg-card/60 p-6">

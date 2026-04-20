@@ -79,8 +79,9 @@ model User {
   chatMessages       ChatMessage[]
   auditLogs          AuditLog[]
   styleExamples      StyleExample[]
-  verificationTokens EmailVerificationToken[]
+  verificationTokens  EmailVerificationToken[]
   passwordResetTokens PasswordResetToken[]
+  sentInvitations     WorkspaceInvitation[]
 
   @@map("users")
 }
@@ -129,6 +130,7 @@ model Workspace {
   deletedAt        DateTime?
 
   members       WorkspaceMember[]
+  invitations   WorkspaceInvitation[]
   subscriptions Subscription[]
   usageRecords  UsageRecord[]
   conversations Conversation[]
@@ -142,6 +144,24 @@ model Workspace {
   styleProfiles StyleProfile[]
 
   @@map("workspaces")
+}
+
+model WorkspaceInvitation {
+  id          String              @id @default(uuid()) @db.Uuid
+  workspaceId String              @db.Uuid
+  email       String
+  role        WorkspaceMemberRole @default(MEMBER)
+  tokenHash   String              @unique
+  expiresAt   DateTime
+  usedAt      DateTime?
+  invitedById String              @db.Uuid
+  createdAt   DateTime            @default(now())
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  invitedBy User      @relation(fields: [invitedById], references: [id], onDelete: Restrict)
+
+  @@index([workspaceId])
+  @@map("workspace_invitations")
 }
 
 model WorkspaceMember {
