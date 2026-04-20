@@ -102,18 +102,6 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           .activeWorkspaceId as string;
         token.activeWorkspaceRole = (user as Record<string, unknown>)
           .activeWorkspaceRole as string;
-      } else if (token.id) {
-        // Subsequent requests: check if password was reset after this token was issued
-        const dbUser = await db.user.findUnique({
-          where: { id: token.id as string },
-          select: { passwordChangedAt: true },
-        });
-        if (dbUser?.passwordChangedAt) {
-          const tokenIat = (token.iat as number) * 1000; // seconds → ms
-          if (dbUser.passwordChangedAt.getTime() > tokenIat) {
-            return null as never; // Force re-login
-          }
-        }
       }
       return token;
     },
