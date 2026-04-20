@@ -108,9 +108,9 @@ export async function POST(
       data: { status: "PROCESSING" },
     });
 
-    // 6. Get file path from storage
+    // 6. Get file buffer from storage (works for both local and S3)
     const storage = getStorageProvider();
-    const filePath = storage.getFilePath(asset.storagePath);
+    const fileBuffer = await storage.getFileBuffer(asset.storagePath);
 
     // 7. Build per-conversation instructions (injected into general analysis prompt)
     const instructionParts: string[] = [];
@@ -150,7 +150,7 @@ export async function POST(
     let result;
     try {
       result = await analyzeConversationAudio({
-        filePath,
+        fileBuffer,
         mimeType: asset.mimeType,
         outputLanguage,
         userInstructions,

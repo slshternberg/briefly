@@ -81,7 +81,8 @@ export interface StyleExampleForPrompt {
 }
 
 export interface AnalyzeAudioParams {
-  filePath: string;
+  filePath?: string;
+  fileBuffer?: Buffer;
   mimeType: string;
   outputLanguage: string;
   userInstructions?: string;
@@ -106,31 +107,35 @@ export interface AnalyzeAudioResult {
  */
 async function uploadAndWaitForFile(
   ai: GoogleGenAI,
-  filePath: string,
+  fileSource: string | Buffer,
   mimeType: string
 ) {
-  const uploadedFile = await ai.files.upload({
-    file: filePath,
+  const uploadInput = typeof fileSource === "string"
+    ? fileSource
+    : new Blob([new Uint8Array(fileSource)], { type: mimeType });
+
+  const uploaded = await ai.files.upload({
+    file: uploadInput,
     config: { mimeType },
   });
 
-  if (!uploadedFile.name) {
+  if (!uploaded.name) {
     throw new Error("File upload failed: no file name returned");
   }
 
-  let file = uploadedFile;
+  let polled = uploaded;
   let attempts = 0;
-  while (file.state === "PROCESSING" && attempts < 30) {
+  while (polled.state === "PROCESSING" && attempts < 30) {
     await new Promise((resolve) => setTimeout(resolve, 2000));
-    file = await ai.files.get({ name: uploadedFile.name! });
+    polled = await ai.files.get({ name: uploaded.name! });
     attempts++;
   }
 
-  if (file.state === "FAILED") {
+  if (polled.state === "FAILED") {
     throw new Error("File processing failed on Gemini side");
   }
 
-  return { file, fileName: uploadedFile.name! };
+  return { file: polled, fileName: uploaded.name! };
 }
 
 export async function analyzeConversationAudio(
@@ -139,11 +144,9 @@ export async function analyzeConversationAudio(
   const ai = getClient();
 
   // Step 1: Upload audio file once
-  const { file, fileName } = await uploadAndWaitForFile(
-    ai,
-    params.filePath,
-    params.mimeType
-  );
+  const fileSource = params.fileBuffer ?? params.filePath;
+  if (!fileSource) throw new Error("Either filePath or fileBuffer must be provided");
+  const { file, fileName } = await uploadAndWaitForFile(ai, fileSource, params.mimeType);
 
   const fileDataPart = {
     fileData: {
