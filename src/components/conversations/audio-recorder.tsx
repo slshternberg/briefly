@@ -224,6 +224,15 @@ export function AudioRecorder({
             >
               {mp3Busy ? labels.convertingMp3 : labels.downloadMp3}
             </button>
+            {recorder.recordedFile && (
+              <a
+                href={recorder.mediaUrl!}
+                download={recorder.recordedFile.name}
+                className="px-3 py-1.5 rounded-lg bg-muted/40 text-muted-foreground text-xs font-medium hover:bg-muted/70 hover:text-foreground transition"
+              >
+                הורד קובץ מקורי
+              </a>
+            )}
             <button
               onClick={recorder.reset}
               className="text-sm text-muted-foreground hover:text-foreground transition"
