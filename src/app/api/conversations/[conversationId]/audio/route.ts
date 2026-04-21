@@ -17,7 +17,12 @@ export async function GET(
     const workspaceId = session.user.activeWorkspaceId;
 
     const asset = await db.conversationAsset.findFirst({
-      where: { conversationId, workspaceId, uploadStatus: "COMPLETED" },
+      where: {
+        conversationId,
+        workspaceId,
+        uploadStatus: "COMPLETED",
+        conversation: { deletedAt: null },
+      },
       orderBy: { createdAt: "desc" },
     });
 
