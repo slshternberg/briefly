@@ -6,6 +6,39 @@ suggested fix.
 
 ---
 
+## storageBytesUsed drift monitoring
+
+**Severity:** low  
+**Area:** `src/lib/billing.ts` — `decrementStorageUsage`, conversation and style example DELETE handlers
+
+`decrementStorageUsage` failures are swallowed with `console.error`. There is no metric or
+alert tracking how often this happens. Drift will silently accumulate until `recount-storage.ts`
+is run manually.
+
+**Suggested actions:**
+- Add a Prometheus counter or structured log event for decrement failures.
+- Schedule `recount-storage.ts` as a monthly cron job to catch any drift automatically.
+- Consider making `decrementStorageUsage` non-fire-and-forget if storage accuracy becomes
+  critical (e.g., when storage-based billing goes live).
+
+---
+
+## StyleExample has no soft-delete (inconsistent with Conversation)
+
+**Severity:** low  
+**Area:** `prisma/schema.prisma` model `StyleExample`, `src/app/api/workspace/style-examples/`
+
+`Conversation` uses soft-delete (`deletedAt: DateTime?`) but `StyleExample` uses hard-delete.
+This means:
+- Deleted style examples are unrecoverable without a DB backup.
+- The `recount-storage.ts` script cannot account for "recently deleted but still tracked" style
+  examples the way it does for conversations.
+
+If user-facing "undo delete" for style examples is ever needed, this inconsistency will require
+a migration. Consider adding `deletedAt` to `StyleExample` in a future schema cleanup.
+
+---
+
 ## gmail token refresh: concurrent OAuth refresh writes could race
 
 **Severity:** low  
