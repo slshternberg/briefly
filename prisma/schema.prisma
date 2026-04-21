@@ -74,6 +74,12 @@ model User {
   googleRefreshToken String?
   googleEmail        String?
 
+  // Encrypted columns — added in migration add_encrypted_google_token_columns.
+  // Dual-write with the plaintext columns above during migration window.
+  // Plaintext columns will be dropped after backfill (see migration drop_plaintext_google_tokens).
+  googleAccessTokenEncrypted  String?
+  googleRefreshTokenEncrypted String?
+
   memberships        WorkspaceMember[]
   conversations      Conversation[]
   chatMessages       ChatMessage[]

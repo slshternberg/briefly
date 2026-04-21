@@ -3,6 +3,10 @@ import { db } from "@/lib/db";
 import { getStorageProvider } from "@/services/storage";
 import { google } from "googleapis";
 import { NextRequest, NextResponse } from "next/server";
+import {
+  getDecryptedGoogleTokens,
+  refreshEncryptedAccessToken,
+} from "@/services/google/tokens";
 
 function encodeSubject(subject: string) {
   return `=?UTF-8?B?${Buffer.from(subject, "utf-8").toString("base64")}?=`;
@@ -30,13 +34,13 @@ export async function POST(
     return NextResponse.json({ error: "Conversation not found" }, { status: 404 });
   }
 
-  const user = await db.user.findUnique({
-    where: { id: session.user.id },
-    select: { googleAccessToken: true, googleRefreshToken: true, googleEmail: true },
-  });
-
-  if (!user?.googleAccessToken) {
-    return NextResponse.json({ error: "Google account not connected" }, { status: 400 });
+  // Read 2 of 2: get decrypted tokens (prefers encrypted columns, falls back to plaintext)
+  const tokens = await getDecryptedGoogleTokens(session.user.id);
+  if (!tokens?.access) {
+    return NextResponse.json(
+      { error: "Google account not connected" },
+      { status: 400 }
+    );
   }
 
   const oauth2Client = new google.auth.OAuth2(
@@ -46,24 +50,23 @@ export async function POST(
   );
 
   oauth2Client.setCredentials({
-    access_token: user.googleAccessToken,
-    refresh_token: user.googleRefreshToken,
+    access_token: tokens.access,
+    refresh_token: tokens.refresh ?? undefined,
   });
 
-  oauth2Client.on("tokens", async (tokens) => {
-    if (tokens.access_token) {
-      try {
-        await db.user.update({
-          where: { id: session.user.id },
-          data: { googleAccessToken: tokens.access_token },
-        });
-      } catch (err) {
-        console.error("Failed to persist refreshed OAuth token:", err);
-      }
+  // Write 3 of 3: token refresh — dual-write (encrypted + plaintext)
+  oauth2Client.on("tokens", async (newTokens) => {
+    if (newTokens.access_token) {
+      await refreshEncryptedAccessToken(
+        session.user.id,
+        newTokens.access_token
+      ).catch((err) =>
+        console.error("Failed to persist refreshed OAuth token:", err)
+      );
     }
   });
 
-  // Load audio asset
+  // Load audio asset (optional attachment)
   const asset = await db.conversationAsset.findFirst({
     where: { conversationId },
     select: { storagePath: true, originalName: true, mimeType: true },
@@ -79,8 +82,7 @@ ${body
   .replace(/>/g, "&gt;")
   .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
   .replace(/\*(.*?)\*/g, "<em>$1</em>")
-  .replace(/\n/g, "<br>")
-}
+  .replace(/\n/g, "<br>")}
 </body>
 </html>`;
 
@@ -89,7 +91,7 @@ ${body
 
   let rawParts = [
     `MIME-Version: 1.0`,
-    `From: ${user.googleEmail}`,
+    `From: ${tokens.email ?? session.user.email}`,
     `To: ${to}`,
     `Subject: ${encodeSubject(subject)}`,
     `Content-Type: multipart/mixed; boundary="${boundary}"`,
@@ -117,7 +119,7 @@ ${body
         fileBase64,
       ]);
     } catch {
-      // If file not found, send without attachment
+      // File not found — send without attachment
     }
   }
 

@@ -1,5 +1,8 @@
 import { google } from "googleapis";
-import { db } from "@/lib/db";
+import {
+  getDecryptedGoogleTokens,
+  refreshEncryptedAccessToken,
+} from "@/services/google/tokens";
 
 function encodeSubject(subject: string) {
   return `=?UTF-8?B?${Buffer.from(subject, "utf-8").toString("base64")}?=`;
@@ -21,12 +24,9 @@ export async function sendAnalysisCompleteNotification({
   baseUrl: string;
 }) {
   try {
-    const user = await db.user.findUnique({
-      where: { id: userId },
-      select: { googleAccessToken: true, googleRefreshToken: true, googleEmail: true },
-    });
-
-    if (!user?.googleAccessToken || !user?.googleEmail) return;
+    // Read 1 of 2: get decrypted tokens (prefers encrypted columns, falls back to plaintext)
+    const tokens = await getDecryptedGoogleTokens(userId);
+    if (!tokens?.access || !tokens.email) return;
 
     const oauth2Client = new google.auth.OAuth2(
       process.env.GOOGLE_CLIENT_ID,
@@ -35,16 +35,16 @@ export async function sendAnalysisCompleteNotification({
     );
 
     oauth2Client.setCredentials({
-      access_token: user.googleAccessToken,
-      refresh_token: user.googleRefreshToken,
+      access_token: tokens.access,
+      refresh_token: tokens.refresh ?? undefined,
     });
 
-    oauth2Client.on("tokens", async (tokens) => {
-      if (tokens.access_token) {
-        await db.user.update({
-          where: { id: userId },
-          data: { googleAccessToken: tokens.access_token },
-        });
+    // Write 2 of 3: token refresh — dual-write (encrypted + plaintext)
+    oauth2Client.on("tokens", async (newTokens) => {
+      if (newTokens.access_token) {
+        await refreshEncryptedAccessToken(userId, newTokens.access_token).catch(
+          (err) => console.error("Failed to persist refreshed OAuth token:", err)
+        );
       }
     });
 
@@ -69,8 +69,8 @@ export async function sendAnalysisCompleteNotification({
 
     const rawMessage = [
       `MIME-Version: 1.0`,
-      `From: ${user.googleEmail}`,
-      `To: ${user.googleEmail}`,
+      `From: ${tokens.email}`,
+      `To: ${tokens.email}`,
       `Subject: ${subject}`,
       `Content-Type: text/html; charset=UTF-8`,
       `Content-Transfer-Encoding: base64`,
@@ -81,7 +81,6 @@ export async function sendAnalysisCompleteNotification({
     const raw = Buffer.from(rawMessage, "utf-8").toString("base64url");
     const gmail = google.gmail({ version: "v1", auth: oauth2Client });
     await gmail.users.messages.send({ userId: "me", requestBody: { raw } });
-
   } catch (err) {
     // Notification failure should never fail the analysis
     console.error("Failed to send analysis notification email:", err);
@@ -93,10 +92,10 @@ export async function sendAnalysisCompleteNotification({
 // ============================================================================
 
 const MODEL_PRICING: Record<string, { input: number; output: number }> = {
-  "gemini-2.5-flash":      { input: 0.15,  output: 0.60 },
-  "gemini-2.5-flash-lite": { input: 0.10,  output: 0.40 },
-  "gemini-2.5-pro":        { input: 1.25,  output: 10.00 },
-  "gemini-2.0-flash-001":  { input: 0.10,  output: 0.40 },
+  "gemini-2.5-flash": { input: 0.15, output: 0.6 },
+  "gemini-2.5-flash-lite": { input: 0.1, output: 0.4 },
+  "gemini-2.5-pro": { input: 1.25, output: 10.0 },
+  "gemini-2.0-flash-001": { input: 0.1, output: 0.4 },
 };
 
 /**
@@ -109,7 +108,6 @@ export function calculateGeminiCost(
 ): number | null {
   if (!promptTokens || !outputTokens) return null;
 
-  // Match by prefix in case of versioned model names
   const pricing =
     MODEL_PRICING[model] ??
     Object.entries(MODEL_PRICING).find(([key]) => model.startsWith(key))?.[1];
