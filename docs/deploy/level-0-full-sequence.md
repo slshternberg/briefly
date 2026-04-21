@@ -115,16 +115,30 @@ WHERE c.status = 'COMPLETED'
   AND c."deletedAt" IS NULL;
 -- Should return 0 (or a small number for very old conversations with corrupted audio)
 
--- 3c: Storage — spot-check one workspace
-SELECT w.id, w.name, ur."storageBytesUsed",
-       SUM(ca."sizeBytes") AS actual_asset_bytes
+-- 3c: Storage — spot-check one workspace (mirrors recount-storage.ts logic exactly)
+SELECT
+  w.id,
+  w.name,
+  ur."storageBytesUsed"                                             AS stored,
+  COALESCE(asset_sum.total, 0) + COALESCE(style_sum.total, 0)      AS actual
 FROM workspaces w
-JOIN usage_records ur ON ur."workspaceId" = w.id
-LEFT JOIN conversation_assets ca ON ca."workspaceId" = w.id
-LEFT JOIN conversations c ON c.id = ca."conversationId" AND c."deletedAt" IS NULL
-GROUP BY w.id, w.name, ur."storageBytesUsed"
+JOIN usage_records ur
+  ON ur."workspaceId" = w.id
+  AND ur."periodStart" = date_trunc('month', NOW())
+LEFT JOIN (
+  SELECT ca."workspaceId", SUM(ca."sizeBytes") AS total
+  FROM conversation_assets ca
+  JOIN conversations c ON c.id = ca."conversationId"
+  WHERE c."deletedAt" IS NULL AND ca."uploadStatus" = 'COMPLETED'
+  GROUP BY ca."workspaceId"
+) asset_sum ON asset_sum."workspaceId" = w.id
+LEFT JOIN (
+  SELECT "workspaceId", SUM("audioSizeBytes") AS total
+  FROM style_examples
+  GROUP BY "workspaceId"
+) style_sum ON style_sum."workspaceId" = w.id
 LIMIT 10;
--- storageBytesUsed should be close to actual_asset_bytes (exact match after recount)
+-- stored should equal actual after recount-storage.ts runs
 ```
 
 **If 3a returns > 0:** the backfill didn't run, or a user connected Gmail after backfill and
