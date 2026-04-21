@@ -27,3 +27,21 @@ retry delivers the older refresh before the newer one.
 - Or use an advisory lock / Redis-based mutex around the refresh write.
 - Alternatively, centralize OAuth client construction so a single instance is
   reused per user per request lifecycle, preventing duplicate listeners.
+
+---
+
+## Conversation.durationSec is dead — consider dropping
+
+**Severity:** low  
+**Area:** `prisma/schema.prisma`, `conversations` table
+
+`Conversation.durationSec` (`Int?`) has zero reads and zero writes in any TypeScript
+file. All billing and display uses `ConversationAsset.durationSeconds` instead.
+
+Confirmed during item 0.2 work (grep -rn "durationSec" src/).
+
+**Suggested fix:** drop in a future schema cleanup migration:
+```sql
+ALTER TABLE "conversations" DROP COLUMN "durationSec";
+```
+No backfill needed — the column is always NULL in production.

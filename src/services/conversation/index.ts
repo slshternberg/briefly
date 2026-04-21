@@ -51,6 +51,7 @@ export async function uploadAudioAsset(params: {
   originalName: string;
   mimeType: string;
   buffer: Buffer;
+  durationSeconds?: number | null;
 }) {
   const storage = getStorageProvider();
 
@@ -73,6 +74,7 @@ export async function uploadAudioAsset(params: {
         sizeBytes: BigInt(sizeBytes),
         storagePath,
         uploadStatus: "COMPLETED",
+        durationSeconds: params.durationSeconds ?? null,
       },
     }),
     db.conversation.update({

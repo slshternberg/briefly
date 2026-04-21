@@ -8,6 +8,9 @@ import {
 } from "@/services/conversation";
 import { AssetSourceType } from "@prisma/client";
 import { rateLimitUser } from "@/lib/rate-limit";
+import { checkStorageLimit, incrementStorageUsage } from "@/lib/billing";
+import { logAudit } from "@/lib/audit";
+import { extractDurationSeconds } from "@/lib/duration";
 
 export async function POST(
   req: Request,
@@ -81,11 +84,24 @@ export async function POST(
       );
     }
 
+    // Storage quota check
+    const storageError = await checkStorageLimit(workspaceId, file.size);
+    if (storageError) {
+      return NextResponse.json({ error: storageError }, { status: 402 });
+    }
+
     // Validate sourceType
     const validSourceType: AssetSourceType =
       sourceType === "RECORDED" ? "RECORDED" : "UPLOADED";
 
     const buffer = Buffer.from(await file.arrayBuffer());
+
+    // Extract duration with a tight timeout — failure never blocks the upload.
+    // The /process route will retry if this returns null.
+    const durationSeconds = await extractDurationSeconds(
+      { buffer, mimeType },
+      2000
+    );
 
     const asset = await uploadAudioAsset({
       workspaceId,
@@ -94,6 +110,20 @@ export async function POST(
       originalName: file.name,
       mimeType,
       buffer,
+      durationSeconds,
+    });
+
+    incrementStorageUsage(workspaceId, file.size).catch(
+      (err) => console.error("Storage usage increment failed:", err)
+    );
+
+    logAudit({
+      workspaceId,
+      userId: session.user.id,
+      action: "conversation.upload",
+      targetType: "conversation",
+      targetId: conversationId,
+      metadata: { mimeType, sizeBytes: file.size, sourceType: validSourceType },
     });
 
     return NextResponse.json(

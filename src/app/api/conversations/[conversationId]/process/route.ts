@@ -2,12 +2,13 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { rateLimitUser } from "@/lib/rate-limit";
-import { checkConversationLimit, incrementConversationUsage } from "@/lib/billing";
-import { logAudit } from "@/lib/audit";
+import {
+  checkConversationLimit,
+  checkAudioMinutesLimit,
+} from "@/lib/billing";
+import { runAnalysisJob } from "@/services/analysis/worker";
+import { extractDurationSeconds } from "@/lib/duration";
 import { getStorageProvider } from "@/services/storage";
-import { analyzeConversationAudio } from "@/services/gemini";
-import { getActiveStyleProfile } from "@/services/style";
-import { sendAnalysisCompleteNotification } from "@/services/gmail";
 
 export async function POST(
   req: Request,
@@ -43,7 +44,10 @@ export async function POST(
       if (body.outputLanguage && typeof body.outputLanguage === "string") {
         outputLanguage = body.outputLanguage;
       }
-      if (body.conversationInstructions && typeof body.conversationInstructions === "string") {
+      if (
+        body.conversationInstructions &&
+        typeof body.conversationInstructions === "string"
+      ) {
         conversationInstructions = body.conversationInstructions.slice(0, 3000);
       }
       if (body.sendNotification === true) {
@@ -53,17 +57,17 @@ export async function POST(
       // No body or invalid JSON — use defaults
     }
 
-    // 3. Load workspace (for custom instructions + custom prompt)
+    // 3. Load workspace (for custom instructions + default language)
     const workspace = await db.workspace.findUnique({
       where: { id: workspaceId },
       select: { customInstructions: true, defaultLanguage: true },
     });
 
-    // Use workspace default language if none provided in request
     if (!outputLanguage || outputLanguage === "Hebrew") {
       outputLanguage = workspace?.defaultLanguage || "Hebrew";
     }
 
+    // 4. Validate conversation
     const conversation = await db.conversation.findFirst({
       where: { id: conversationId, workspaceId, deletedAt: null },
     });
@@ -85,13 +89,9 @@ export async function POST(
       );
     }
 
-    // 4. Get the audio asset
+    // 5. Get the audio asset
     const asset = await db.conversationAsset.findFirst({
-      where: {
-        conversationId,
-        workspaceId,
-        uploadStatus: "COMPLETED",
-      },
+      where: { conversationId, workspaceId, uploadStatus: "COMPLETED" },
       orderBy: { createdAt: "desc" },
     });
 
@@ -102,149 +102,66 @@ export async function POST(
       );
     }
 
-    // 5. Set status to PROCESSING
+    // Fallback: if duration wasn't captured at upload time, attempt extraction now.
+    // Failure → 422 so the user knows to re-upload rather than getting silent billing at 0s.
+    let assetDurationSeconds = asset.durationSeconds;
+    if (assetDurationSeconds == null) {
+      const storage = getStorageProvider();
+      const isLocal = process.env.STORAGE_TYPE !== "s3";
+      const retry = await extractDurationSeconds(
+        isLocal
+          ? { filePath: storage.getFilePath(asset.storagePath) }
+          : { buffer: await storage.getFileBuffer(asset.storagePath), mimeType: asset.mimeType }
+      );
+      if (retry == null) {
+        return NextResponse.json(
+          { error: "Audio duration could not be determined. Please re-upload the file." },
+          { status: 422 }
+        );
+      }
+      await db.conversationAsset.update({
+        where: { id: asset.id },
+        data: { durationSeconds: retry },
+      });
+      assetDurationSeconds = retry;
+    }
+
+    // Billing: check audio minutes limit
+    const audioLimitError = await checkAudioMinutesLimit(
+      workspaceId,
+      assetDurationSeconds
+    );
+    if (audioLimitError) {
+      return NextResponse.json({ error: audioLimitError }, { status: 402 });
+    }
+
+    // 6. Mark as PROCESSING — visible to the client immediately
     await db.conversation.update({
       where: { id: conversationId },
       data: { status: "PROCESSING" },
     });
 
-    // 6. Get file buffer from storage (works for both local and S3)
-    const storage = getStorageProvider();
-    const fileBuffer = await storage.getFileBuffer(asset.storagePath);
-
-    // 7. Build per-conversation instructions (injected into general analysis prompt)
-    const instructionParts: string[] = [];
-    if (conversationInstructions) {
-      instructionParts.push(`[Conversation-specific instructions]\n${conversationInstructions}`);
-    }
-    const userInstructions = instructionParts.length > 0
-      ? instructionParts.join("\n\n")
-      : undefined;
-
-    // 8. Load style profile + raw email examples for few-shot prompting
-    const styleProfile = await getActiveStyleProfile(workspaceId);
-
-    // Load the 3 most recent completed style examples.
-    // Their actual email text is sent to Gemini as few-shot style examples —
-    // this is far more accurate than relying on the abstract style profile alone.
-    const rawStyleExamples = workspace?.customInstructions
-      ? await db.styleExample.findMany({
-          where: { workspaceId, status: "COMPLETED" },
-          select: { title: true, sentEmailSubject: true, sentEmailBody: true },
-          orderBy: { createdAt: "desc" },
-          take: 3,
-        })
-      : [];
-
-    const styleExamples = rawStyleExamples.map((ex) => ({
-      title: ex.title,
-      emailSubject: ex.sentEmailSubject,
-      emailBody: ex.sentEmailBody,
-    }));
-
-    // 9. Call Gemini — general analysis + custom summary (if custom prompt exists)
-    //    customPrompt = workspace.customInstructions (from Settings)
-    //    userInstructions = per-conversation instructions (from Analyze button)
-    //    styleProfile = abstract style patterns (from profile generation)
-    //    styleExamples = actual sent emails for few-shot style matching (primary signal)
-    let result;
-    try {
-      result = await analyzeConversationAudio({
-        fileBuffer,
-        mimeType: asset.mimeType,
-        outputLanguage,
-        userInstructions,
-        customPrompt: workspace?.customInstructions || undefined,
-        styleProfile,
-        styleExamples: styleExamples.length > 0 ? styleExamples : undefined,
-      });
-    } catch (geminiError) {
-      await db.conversation.update({
-        where: { id: conversationId },
-        data: { status: "FAILED" },
-      });
-
-      console.error("Gemini processing error:", geminiError);
-
-      const raw = geminiError instanceof Error ? geminiError.message : String(geminiError);
-
-      let errorCode = "processing_failed";
-      if (raw.includes("503") || raw.includes("UNAVAILABLE") || raw.includes("high demand") || raw.includes("overloaded")) {
-        errorCode = "overloaded";
-      } else if (raw.includes("429") || raw.includes("RESOURCE_EXHAUSTED") || raw.includes("quota") || raw.includes("rate")) {
-        errorCode = "quota_exceeded";
-      } else if (raw.includes("401") || raw.includes("403") || raw.includes("API_KEY") || raw.includes("permission")) {
-        errorCode = "auth_error";
-      }
-
-      return NextResponse.json({ error: errorCode }, { status: 502 });
-    }
-
-    // 9. Store results — general analysis + custom summary together
-    const structuredData = {
-      ...result.analysis,
-      customSummary: result.customSummary,
-    };
-
-    await db.$transaction([
-      db.conversationSummary.upsert({
-        where: { conversationId },
-        create: {
-          workspaceId,
-          conversationId,
-          rawText: result.rawResponse,
-          structuredData: JSON.parse(JSON.stringify(structuredData)),
-          modelUsed: result.modelUsed,
-          promptTokens: result.promptTokens,
-          outputTokens: result.outputTokens,
-        },
-        update: {
-          rawText: result.rawResponse,
-          structuredData: JSON.parse(JSON.stringify(structuredData)),
-          modelUsed: result.modelUsed,
-          promptTokens: result.promptTokens,
-          outputTokens: result.outputTokens,
-        },
-      }),
-      db.conversation.update({
-        where: { id: conversationId },
-        data: { status: "COMPLETED", language: outputLanguage },
-      }),
-    ]);
-
-    // Audit log
-    logAudit({
+    // 7. Run the analysis in the background.
+    //    The HTTP response returns immediately; the job continues in the same
+    //    Node.js process (PM2 keeps it alive).
+    //    If the server restarts mid-job, instrumentation.ts will auto-fail the
+    //    conversation on the next startup so users can retry.
+    void runAnalysisJob({
+      conversationId,
       workspaceId,
       userId: session.user.id,
-      action: "conversation.process",
-      targetType: "conversation",
-      targetId: conversationId,
-      metadata: { modelUsed: result.modelUsed, outputLanguage },
+      assetId: asset.id,
+      assetStoragePath: asset.storagePath,
+      assetMimeType: asset.mimeType,
+      assetDurationSeconds,
+      outputLanguage,
+      conversationInstructions,
+      customInstructions: workspace?.customInstructions || undefined,
+      conversationTitle: conversation.title,
+      sendNotification,
     });
 
-    // Increment usage record (fire-and-forget)
-    incrementConversationUsage(workspaceId, asset.durationSeconds ?? 0).catch(
-      (err) => console.error("Usage increment failed:", err)
-    );
-
-    // Send notification email (only if user opted in — fire-and-forget)
-    if (sendNotification) {
-      const baseUrl = process.env.AUTH_URL || "http://localhost:3000";
-      sendAnalysisCompleteNotification({
-        userId: session.user.id,
-        conversationId,
-        conversationTitle: conversation.title,
-        baseUrl,
-      }).catch((err) => {
-        console.error("Failed to send analysis complete notification:", err);
-      });
-    }
-
-    return NextResponse.json({
-      status: "COMPLETED",
-      summary: result.analysis,
-      customSummary: result.customSummary,
-    });
+    return NextResponse.json({ status: "PROCESSING" });
   } catch (error) {
     try {
       await db.conversation.update({
@@ -252,7 +169,7 @@ export async function POST(
         data: { status: "FAILED" },
       });
     } catch {
-      // Ignore
+      // Ignore — conversation may not exist
     }
 
     console.error("Process conversation error:", error);
