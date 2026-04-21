@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { getStorageProvider } from "@/services/storage";
 import { logAudit } from "@/lib/audit";
+import { decrementStorageUsage } from "@/lib/billing";
 
 export async function PATCH(
   req: Request,
@@ -61,7 +62,7 @@ export async function DELETE(
 
     const conversation = await db.conversation.findFirst({
       where: { id: conversationId, workspaceId, deletedAt: null },
-      include: { assets: { select: { storagePath: true } } },
+      include: { assets: { select: { storagePath: true, sizeBytes: true } } },
     });
 
     if (!conversation) {
@@ -79,6 +80,16 @@ export async function DELETE(
       where: { id: conversationId },
       data: { deletedAt: new Date() },
     });
+
+    // Decrement storage quota — fire-and-forget, never blocks the response
+    const totalBytes = conversation.assets.reduce(
+      (sum, a) => sum + Number(a.sizeBytes), 0
+    );
+    if (totalBytes > 0) {
+      decrementStorageUsage(workspaceId, totalBytes).catch(
+        (err) => console.error("Storage decrement failed:", err)
+      );
+    }
 
     logAudit({
       workspaceId,

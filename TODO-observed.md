@@ -30,6 +30,22 @@ retry delivers the older refresh before the newer one.
 
 ---
 
+## npm audit: 14 vulnerabilities after music-metadata@7 install
+
+**Severity:** unknown (pre-existing vs introduced — unverified)  
+**Area:** `package.json`, `music-metadata@7` transitive deps
+
+`npm install music-metadata@7` reported 14 vulnerabilities (8 moderate, 5 high, 1 critical).
+Not confirmed whether these were pre-existing in the repo or introduced by the new package.
+
+**Suggested action:**
+- Run `npm audit` before and after removing `music-metadata` to isolate blame.
+- If introduced by `music-metadata@7`'s transitive deps → evaluate `music-metadata@8` (ESM,
+  add to `serverExternalPackages`) or an alternative like `get-audio-duration`.
+- If pre-existing → open a separate security audit task unrelated to this change.
+
+---
+
 ## Conversation.durationSec is dead — consider dropping
 
 **Severity:** low  

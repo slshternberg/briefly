@@ -1,11 +1,12 @@
 import { db } from "@/lib/db";
 
-// Free tier limits applied when no active subscription exists
+// Free-tier fallback: used when no active subscription exists
 const FREE_LIMITS = {
   maxConversationsPerMonth: 10,
   maxAudioMinutesPerMonth: 120,
   maxAiQueriesPerMonth: 50,
   maxStorageMb: 500,
+  maxMembersPerWorkspace: 3,
 };
 
 function periodStart(): Date {
@@ -37,6 +38,10 @@ async function getUsage(workspaceId: string) {
   });
 }
 
+export async function getPlanLimits(workspaceId: string) {
+  return getLimits(workspaceId);
+}
+
 export async function checkConversationLimit(workspaceId: string): Promise<string | null> {
   const [limits, usage] = await Promise.all([getLimits(workspaceId), getUsage(workspaceId)]);
   const count = usage?.conversationCount ?? 0;
@@ -46,11 +51,45 @@ export async function checkConversationLimit(workspaceId: string): Promise<strin
   return null;
 }
 
+export async function checkAudioMinutesLimit(workspaceId: string, newAudioSeconds: number): Promise<string | null> {
+  const [limits, usage] = await Promise.all([getLimits(workspaceId), getUsage(workspaceId)]);
+  const usedSeconds = usage?.audioSecondsUsed ?? 0;
+  const limitSeconds = limits.maxAudioMinutesPerMonth * 60;
+  if (usedSeconds + newAudioSeconds > limitSeconds) {
+    const usedMinutes = Math.round(usedSeconds / 60);
+    const limitMinutes = limits.maxAudioMinutesPerMonth;
+    return `הגעת למגבלת דקות האודיו החודשית (${usedMinutes}/${limitMinutes} דקות). שדרגי את התוכנית.`;
+  }
+  return null;
+}
+
 export async function checkAiQueryLimit(workspaceId: string): Promise<string | null> {
   const [limits, usage] = await Promise.all([getLimits(workspaceId), getUsage(workspaceId)]);
   const count = usage?.aiQueryCount ?? 0;
   if (count >= limits.maxAiQueriesPerMonth) {
     return `הגעת למגבלת שאילתות ה-AI החודשית (${limits.maxAiQueriesPerMonth}). שדרגי את התוכנית.`;
+  }
+  return null;
+}
+
+export async function checkStorageLimit(workspaceId: string, newFileSizeBytes: number): Promise<string | null> {
+  const [limits, usage] = await Promise.all([getLimits(workspaceId), getUsage(workspaceId)]);
+  const usedBytes = Number(usage?.storageBytesUsed ?? 0);
+  const limitBytes = limits.maxStorageMb * 1024 * 1024;
+  if (usedBytes + newFileSizeBytes > limitBytes) {
+    const usedMb = Math.round(usedBytes / (1024 * 1024));
+    return `הגעת למגבלת האחסון החודשית (${usedMb}/${limits.maxStorageMb} MB). שדרגי את התוכנית.`;
+  }
+  return null;
+}
+
+export async function checkMembersLimit(workspaceId: string): Promise<string | null> {
+  const [limits, memberCount] = await Promise.all([
+    getLimits(workspaceId),
+    db.workspaceMember.count({ where: { workspaceId } }),
+  ]);
+  if (memberCount >= limits.maxMembersPerWorkspace) {
+    return `הגעת למגבלת החברים בסביבת העבודה (${limits.maxMembersPerWorkspace}). שדרגי את התוכנית.`;
   }
   return null;
 }
@@ -70,6 +109,35 @@ export async function incrementConversationUsage(workspaceId: string, audioSecon
     update: {
       conversationCount: { increment: 1 },
       audioSecondsUsed: { increment: audioSeconds },
+    },
+  });
+}
+
+export async function decrementStorageUsage(workspaceId: string, fileSizeBytes: number) {
+  if (fileSizeBytes <= 0) return;
+  const start = periodStart();
+  // GREATEST(0, ...) prevents storageBytesUsed from going negative on double-deletes.
+  await db.$executeRaw`
+    UPDATE "usage_records"
+    SET "storageBytesUsed" = GREATEST(0, "storageBytesUsed" - ${fileSizeBytes}::bigint)
+    WHERE "workspaceId" = ${workspaceId}::uuid
+      AND "periodStart" = ${start}
+  `;
+}
+
+export async function incrementStorageUsage(workspaceId: string, fileSizeBytes: number) {
+  const start = periodStart();
+  const end = periodEnd();
+  await db.usageRecord.upsert({
+    where: { workspaceId_periodStart: { workspaceId, periodStart: start } },
+    create: {
+      workspaceId,
+      periodStart: start,
+      periodEnd: end,
+      storageBytesUsed: fileSizeBytes,
+    },
+    update: {
+      storageBytesUsed: { increment: fileSizeBytes },
     },
   });
 }

@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { processStyleExample } from "@/services/style";
+import { getStorageProvider } from "@/services/storage";
+import { decrementStorageUsage } from "@/lib/billing";
 
 /** POST — process a style example (analyze the pair with Gemini) */
 export async function POST(
@@ -51,12 +53,22 @@ export async function DELETE(
 
     const example = await db.styleExample.findFirst({
       where: { id: exampleId, workspaceId },
+      select: { id: true, audioStoragePath: true, audioSizeBytes: true },
     });
     if (!example) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
 
+    // Delete audio file from storage before removing the DB record
+    const storage = getStorageProvider();
+    await storage.deleteFile(example.audioStoragePath);
+
     await db.styleExample.delete({ where: { id: exampleId } });
+
+    // Decrement storage quota — fire-and-forget
+    decrementStorageUsage(workspaceId, Number(example.audioSizeBytes)).catch(
+      (err) => console.error("Storage decrement failed:", err)
+    );
 
     return NextResponse.json({ success: true });
   } catch (error) {
