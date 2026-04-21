@@ -36,11 +36,20 @@ export async function processStyleExample(exampleId: string, workspaceId: string
     const ai = getClient();
     const model = getModel();
     const storage = getStorageProvider();
-    const filePath = storage.getFilePath(example.audioStoragePath);
+
+    // Local storage: pass file path so the Gemini SDK streams it directly.
+    // S3: fetch buffer first (no local path available) and wrap in a Blob.
+    const isLocal = process.env.STORAGE_TYPE !== "s3";
+    const uploadFile: string | Blob = isLocal
+      ? storage.getFilePath(example.audioStoragePath)
+      : new Blob(
+          [new Uint8Array(await storage.getFileBuffer(example.audioStoragePath))],
+          { type: example.audioMimeType }
+        );
 
     // Upload audio
     const uploadedFile = await ai.files.upload({
-      file: filePath,
+      file: uploadFile,
       config: { mimeType: example.audioMimeType },
     });
 
