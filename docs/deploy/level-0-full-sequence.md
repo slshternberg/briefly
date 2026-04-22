@@ -159,6 +159,10 @@ is the right behaviour — do not block. Users can re-upload.
 
 ## Stage 4 — Drop plaintext token columns (24h+ after Stage 3)
 
+The `drop_plaintext_google_tokens` migration is intentionally kept OUT of
+`prisma/migrations/` so `prisma migrate deploy` cannot auto-apply it. It lives
+in `prisma/migrations-pending/` until the backfill is verified safe.
+
 **Prerequisites before Stage 4:**
 1. Confirm Stage 3 query 3a returns 0.
 2. Confirm at least one Gmail send worked end-to-end after Stage 1.
@@ -167,8 +171,20 @@ is the right behaviour — do not block. Users can re-upload.
    removes the plaintext column selects from `tokens.ts`. This must go live BEFORE the
    migration runs, otherwise queries will fail on column-not-found.
 
+**Execution:**
+
+Move `prisma/migrations-pending/20260421000001_drop_plaintext_google_tokens/` back
+into `prisma/migrations/` **as a separate commit**. Deploy that commit. Then
+(and only then) run `prisma migrate deploy`:
+
 ```bash
-# Only after cleanup code is live:
+# On a dev machine, after all prerequisites above are confirmed:
+git mv prisma/migrations-pending/20260421000001_drop_plaintext_google_tokens \
+       prisma/migrations/20260421000001_drop_plaintext_google_tokens
+git commit -m "deploy: promote drop_plaintext_google_tokens for Stage 4"
+git push
+
+# On the server, after pulling that commit:
 npx prisma migrate deploy
 # applies: 20260421000001_drop_plaintext_google_tokens
 ```
