@@ -59,6 +59,21 @@ describe("env validation", () => {
     await expect(import("@/lib/env")).rejects.toThrow(/Invalid environment/);
   });
 
+  it("rejects ENCRYPTION_KEY with 64 non-hex characters (regression: length alone is not enough)", async () => {
+    applyEnv({ ...VALID_ENV, ENCRYPTION_KEY: "z".repeat(64) });
+    await expect(import("@/lib/env")).rejects.toThrow(/Invalid environment/);
+  });
+
+  it("accepts valid 64-char hex ENCRYPTION_KEY (all zeros)", async () => {
+    applyEnv({ ...VALID_ENV, ENCRYPTION_KEY: "0".repeat(64) });
+    await expect(import("@/lib/env")).resolves.toBeDefined();
+  });
+
+  it("accepts valid 64-char hex ENCRYPTION_KEY (mixed case)", async () => {
+    applyEnv({ ...VALID_ENV, ENCRYPTION_KEY: "aAbBcCdD".repeat(8) });
+    await expect(import("@/lib/env")).resolves.toBeDefined();
+  });
+
   it("passes with all required vars set", async () => {
     applyEnv(VALID_ENV);
     const mod = await import("@/lib/env");

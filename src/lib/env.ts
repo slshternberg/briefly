@@ -5,7 +5,10 @@ const envSchema = z.object({
   AUTH_SECRET: z.string().min(32, "AUTH_SECRET must be at least 32 chars"),
   AUTH_URL: z.string().url(),
   GEMINI_API_KEY: z.string().min(1),
-  ENCRYPTION_KEY: z.string().length(64, "ENCRYPTION_KEY must be 32 bytes hex"),
+  ENCRYPTION_KEY: z.string().regex(
+    /^[0-9a-fA-F]{64}$/,
+    "ENCRYPTION_KEY must be 64 hex characters (32 bytes)"
+  ),
   SMTP_HOST: z.string().min(1),
   SMTP_PORT: z.string().default("587"),
   SMTP_SECURE: z.string().default("false"),
