@@ -11,6 +11,14 @@ Expected total time: ~30 minutes active + 24h monitoring window before Stage 4.
 
 - [ ] `ENCRYPTION_KEY` is set in production `.env` — must be a 64-char hex string.
   Generate: `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`
+- [ ] **Production `.env` contains all required vars from item 1.6:**
+  - `AUTH_URL` — full URL with protocol, no trailing slash (e.g. `https://briefly.example.com`).
+    Was optional before 1.6; now required — startup will fail without it.
+  - `SMTP_HOST`, `SMTP_USER`, `SMTP_PASS` — all required. `smtp.gmail.com` was hardcoded
+    before 1.6; now read from env.
+  - `SMTP_PORT` (default 587) and `SMTP_SECURE` (default "false") — optional with defaults.
+  - Run `npm run check:env` on the server **before** `pm2 restart` — fails fast with a
+    clear list of missing keys if anything is wrong.
 - [ ] Take a DB snapshot / backup before running any migrations.
 - [ ] Confirm `npm run build` succeeds locally with the new code (already verified — see CI).
 - [ ] Confirm `music-metadata` resolves correctly on the server:
