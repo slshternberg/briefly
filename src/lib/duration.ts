@@ -14,21 +14,21 @@ export async function extractDurationSeconds(
   input: { filePath: string } | { buffer: Buffer; mimeType: string },
   timeoutMs = 5000
 ): Promise<number | null> {
+  let timerId: ReturnType<typeof setTimeout> | undefined;
   try {
     const parse =
       "filePath" in input
         ? parseFile(input.filePath)
         : parseBuffer(input.buffer, input.mimeType);
 
-    const metadata = await Promise.race([
-      parse,
-      new Promise<never>((_, reject) =>
-        setTimeout(
-          () => reject(new Error("Duration extraction timed out")),
-          timeoutMs
-        )
-      ),
-    ]);
+    const timeout = new Promise<never>((_, reject) => {
+      timerId = setTimeout(
+        () => reject(new Error("Duration extraction timed out")),
+        timeoutMs
+      );
+    });
+
+    const metadata = await Promise.race([parse, timeout]);
 
     const raw = metadata.format.duration;
 
@@ -53,5 +53,10 @@ export async function extractDurationSeconds(
       err instanceof Error ? err.message : err
     );
     return null;
+  } finally {
+    // Release the timeout handle on the success path too — Promise.race leaves
+    // the loser pending, so without clearTimeout the Node event loop would
+    // hold the timer until it fires, leaking roughly one handle per call.
+    clearTimeout(timerId);
   }
 }

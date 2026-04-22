@@ -73,6 +73,14 @@ describe("extractDurationSeconds — buffer input", () => {
     );
     expect(result).toBeNull();
   });
+
+  it("clears the timeout handle when parse resolves first (regression: timer leak)", async () => {
+    const clearSpy = vi.spyOn(global, "clearTimeout");
+    mockParseBuffer.mockResolvedValue(metaWith(30));
+    await extractDurationSeconds({ buffer: Buffer.from("data"), mimeType: "audio/mpeg" });
+    expect(clearSpy).toHaveBeenCalled();
+    clearSpy.mockRestore();
+  });
 });
 
 // ── filePath input ────────────────────────────────────────────────────────────
