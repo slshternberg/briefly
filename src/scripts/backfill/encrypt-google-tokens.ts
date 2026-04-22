@@ -16,7 +16,7 @@
 
 import "dotenv/config";
 import { PrismaClient } from "@prisma/client";
-import { encrypt } from "@/lib/crypto";
+import { buildBackfillUpdate } from "@/services/google/tokens";
 
 const db = new PrismaClient();
 const DRY_RUN = process.env.DRY_RUN === "true";
@@ -31,15 +31,28 @@ async function main() {
   let totalUpdated = 0;
 
   while (true) {
+    // Pick up ANY user with at least one plaintext column that is not yet
+    // encrypted — covers mixed-state users (e.g. access refreshed post-deploy
+    // so access is encrypted, but refresh is still plaintext).
     const users = await db.user.findMany({
       where: {
-        googleAccessToken: { not: null },
-        googleAccessTokenEncrypted: null,
+        OR: [
+          {
+            googleAccessToken: { not: null },
+            googleAccessTokenEncrypted: null,
+          },
+          {
+            googleRefreshToken: { not: null },
+            googleRefreshTokenEncrypted: null,
+          },
+        ],
       },
       select: {
         id: true,
         googleAccessToken: true,
+        googleAccessTokenEncrypted: true,
         googleRefreshToken: true,
+        googleRefreshTokenEncrypted: true,
       },
       take: BATCH_SIZE,
       ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
@@ -52,21 +65,14 @@ async function main() {
     totalProcessed += users.length;
 
     for (const user of users) {
-      if (!user.googleAccessToken) {
+      const data = buildBackfillUpdate(user);
+      if (!data) {
         totalSkipped++;
         continue;
       }
 
       if (!DRY_RUN) {
-        await db.user.update({
-          where: { id: user.id },
-          data: {
-            googleAccessTokenEncrypted: encrypt(user.googleAccessToken),
-            ...(user.googleRefreshToken
-              ? { googleRefreshTokenEncrypted: encrypt(user.googleRefreshToken) }
-              : {}),
-          },
-        });
+        await db.user.update({ where: { id: user.id }, data });
       }
 
       totalUpdated++;

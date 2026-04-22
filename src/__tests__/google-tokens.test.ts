@@ -20,6 +20,7 @@ import {
   getDecryptedGoogleTokens,
   setEncryptedGoogleTokens,
   refreshEncryptedAccessToken,
+  buildBackfillUpdate,
 } from "@/services/google/tokens";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -120,6 +121,42 @@ describe("getDecryptedGoogleTokens", () => {
     expect(tokens!.access).toBe(access);
     expect(tokens!.refresh).toBeNull();
   });
+
+  it("mixed state: encrypted access + plaintext refresh (regression: post-refresh mid-migration)", async () => {
+    // Realistic scenario: pre-deploy user had plaintext tokens. After deploy,
+    // access was refreshed (→ encrypted) but refresh token was never touched.
+    const access = "ya29.new_encrypted_access";
+    const refresh = "1//old_plaintext_refresh";
+    mockDb.user.findUnique.mockResolvedValue({
+      googleAccessTokenEncrypted: encrypt(access),
+      googleRefreshTokenEncrypted: null,
+      googleAccessToken: "stale_old_plaintext_access", // stale, should be ignored
+      googleRefreshToken: refresh,
+      googleEmail: "u@gmail.com",
+    });
+
+    const tokens = await getDecryptedGoogleTokens("u1");
+    expect(tokens).not.toBeNull();
+    expect(tokens!.access).toBe(access); // encrypted column wins
+    expect(tokens!.refresh).toBe(refresh); // plaintext fallback
+  });
+
+  it("mixed state: plaintext access + encrypted refresh (defensive — unlikely but symmetric)", async () => {
+    const access = "ya29.plaintext_access";
+    const refresh = "1//encrypted_refresh";
+    mockDb.user.findUnique.mockResolvedValue({
+      googleAccessTokenEncrypted: null,
+      googleRefreshTokenEncrypted: encrypt(refresh),
+      googleAccessToken: access,
+      googleRefreshToken: "stale_plaintext_refresh", // should be ignored
+      googleEmail: null,
+    });
+
+    const tokens = await getDecryptedGoogleTokens("u1");
+    expect(tokens).not.toBeNull();
+    expect(tokens!.access).toBe(access); // plaintext fallback
+    expect(tokens!.refresh).toBe(refresh); // encrypted column wins
+  });
 });
 
 // ── setEncryptedGoogleTokens ──────────────────────────────────────────────────
@@ -163,5 +200,50 @@ describe("refreshEncryptedAccessToken", () => {
     const { data } = mockDb.user.update.mock.calls[0][0];
     expect(decrypt(data.googleAccessTokenEncrypted)).toBe(newToken);
     expect(data.googleAccessToken).toBe(newToken); // dual-write
+  });
+});
+
+// ── buildBackfillUpdate (backfill write path) ────────────────────────────────
+
+describe("buildBackfillUpdate", () => {
+  it("mixed state: encrypted access already set, plaintext refresh only — writes ONLY refresh (regression: must not overwrite encrypted access)", async () => {
+    const existingEncryptedAccess = encrypt("ya29.fresh_access");
+    const plaintextRefresh = "1//old_refresh";
+
+    const data = buildBackfillUpdate({
+      googleAccessToken: "stale_plaintext_access",
+      googleAccessTokenEncrypted: existingEncryptedAccess,
+      googleRefreshToken: plaintextRefresh,
+      googleRefreshTokenEncrypted: null,
+    });
+
+    expect(data).not.toBeNull();
+    // Must NOT include any access-related key — encrypted access already set.
+    expect(data!.googleAccessTokenEncrypted).toBeUndefined();
+    // Must include refresh, and decryption must recover the plaintext value.
+    expect(data!.googleRefreshTokenEncrypted).toBeDefined();
+    expect(decrypt(data!.googleRefreshTokenEncrypted as string)).toBe(plaintextRefresh);
+  });
+
+  it("fresh user: both columns plaintext — writes both encrypted", async () => {
+    const data = buildBackfillUpdate({
+      googleAccessToken: "access",
+      googleAccessTokenEncrypted: null,
+      googleRefreshToken: "refresh",
+      googleRefreshTokenEncrypted: null,
+    });
+    expect(data).not.toBeNull();
+    expect(decrypt(data!.googleAccessTokenEncrypted as string)).toBe("access");
+    expect(decrypt(data!.googleRefreshTokenEncrypted as string)).toBe("refresh");
+  });
+
+  it("fully-encrypted user: nothing to do — returns null", async () => {
+    const data = buildBackfillUpdate({
+      googleAccessToken: "stale",
+      googleAccessTokenEncrypted: encrypt("access"),
+      googleRefreshToken: "stale",
+      googleRefreshTokenEncrypted: encrypt("refresh"),
+    });
+    expect(data).toBeNull();
   });
 });

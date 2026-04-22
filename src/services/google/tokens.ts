@@ -13,6 +13,7 @@
 
 import { db } from "@/lib/db";
 import { encrypt, decrypt } from "@/lib/crypto";
+import type { Prisma } from "@prisma/client";
 
 export interface GoogleTokenSet {
   /** Decrypted access token. */
@@ -44,27 +45,21 @@ export async function getDecryptedGoogleTokens(
 
   if (!user) return null;
 
-  const hasEncrypted = !!user.googleAccessTokenEncrypted;
-  const hasPlaintext = !!user.googleAccessToken;
+  // Per-field fallback: prefer encrypted when present, otherwise plaintext.
+  // A token refresh during the migration window updates only access, leaving
+  // refresh in plaintext — the old "all or nothing" branch returned null for
+  // refresh in that case, and the backfill skipped the user entirely.
+  const access = user.googleAccessTokenEncrypted
+    ? decrypt(user.googleAccessTokenEncrypted)
+    : user.googleAccessToken;
 
-  if (!hasEncrypted && !hasPlaintext) return null; // Gmail not connected
+  const refresh = user.googleRefreshTokenEncrypted
+    ? decrypt(user.googleRefreshTokenEncrypted)
+    : user.googleRefreshToken ?? null;
 
-  if (hasEncrypted) {
-    return {
-      access: decrypt(user.googleAccessTokenEncrypted!),
-      refresh: user.googleRefreshTokenEncrypted
-        ? decrypt(user.googleRefreshTokenEncrypted)
-        : null,
-      email: user.googleEmail ?? null,
-    };
-  }
+  if (!access) return null; // Gmail not connected
 
-  // Fallback: plaintext columns (users not yet backfilled)
-  return {
-    access: user.googleAccessToken!,
-    refresh: user.googleRefreshToken ?? null,
-    email: user.googleEmail ?? null,
-  };
+  return { access, refresh, email: user.googleEmail ?? null };
 }
 
 /**
@@ -106,4 +101,27 @@ export async function refreshEncryptedAccessToken(
       googleAccessToken: newAccessToken, // dual-write for rollback safety
     },
   });
+}
+
+/**
+ * Pure helper for the backfill script: given a user's current token columns,
+ * returns the `data` object for `db.user.update`, or null if nothing needs to
+ * be written. Writes only columns that are still plaintext-only — never
+ * re-encrypts an already-encrypted column (which would overwrite a
+ * freshly-refreshed access token with the stale plaintext copy).
+ */
+export function buildBackfillUpdate(user: {
+  googleAccessToken: string | null;
+  googleAccessTokenEncrypted: string | null;
+  googleRefreshToken: string | null;
+  googleRefreshTokenEncrypted: string | null;
+}): Prisma.UserUpdateInput | null {
+  const data: Prisma.UserUpdateInput = {};
+  if (user.googleAccessToken && !user.googleAccessTokenEncrypted) {
+    data.googleAccessTokenEncrypted = encrypt(user.googleAccessToken);
+  }
+  if (user.googleRefreshToken && !user.googleRefreshTokenEncrypted) {
+    data.googleRefreshTokenEncrypted = encrypt(user.googleRefreshToken);
+  }
+  return Object.keys(data).length === 0 ? null : data;
 }
