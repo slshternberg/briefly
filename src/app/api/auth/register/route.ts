@@ -7,6 +7,7 @@ import { rateLimit } from "@/lib/rate-limit";
 import { Prisma } from "@prisma/client";
 import { sendEmail, buildVerificationEmail } from "@/services/email";
 import { logAudit } from "@/lib/audit";
+import { env } from "@/lib/env";
 
 export async function POST(req: NextRequest) {
   const limited = await rateLimit(req, "register");
@@ -81,8 +82,7 @@ export async function POST(req: NextRequest) {
     db.emailVerificationToken
       .create({ data: { userId: result.user.id, tokenHash, expiresAt } })
       .then(() => {
-        const baseUrl = process.env.AUTH_URL || process.env.NEXTAUTH_URL || "http://localhost:3000";
-        const link = `${baseUrl}/api/auth/verify-email?token=${raw}`;
+        const link = `${env.AUTH_URL}/api/auth/verify-email?token=${raw}`;
         return sendEmail({
           to: result.user.email,
           subject: "Briefly — אמתי את כתובת המייל שלך",

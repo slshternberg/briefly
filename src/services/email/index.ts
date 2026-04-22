@@ -1,12 +1,13 @@
 import nodemailer from "nodemailer";
+import { env } from "@/lib/env";
 
 const transporter = nodemailer.createTransport({
-  host: "smtp.gmail.com",
-  port: 587,
-  secure: false,
+  host: env.SMTP_HOST,
+  port: parseInt(env.SMTP_PORT, 10),
+  secure: env.SMTP_SECURE === "true",
   auth: {
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASS,
+    user: env.SMTP_USER,
+    pass: env.SMTP_PASS,
   },
 });
 
@@ -17,12 +18,8 @@ interface SendEmailParams {
 }
 
 export async function sendEmail({ to, subject, html }: SendEmailParams): Promise<void> {
-  if (process.env.NODE_ENV === "development" && !process.env.SMTP_USER) {
-    console.log(`[Email DEV] To: ${to}\nSubject: ${subject}\n${html}`);
-    return;
-  }
   await transporter.sendMail({
-    from: `"Briefly" <${process.env.SMTP_USER}>`,
+    from: `"Briefly" <${env.SMTP_USER}>`,
     to,
     subject,
     html,

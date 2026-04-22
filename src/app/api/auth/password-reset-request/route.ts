@@ -3,6 +3,7 @@ import crypto from "crypto";
 import { db } from "@/lib/db";
 import { rateLimit } from "@/lib/rate-limit";
 import { sendEmail, buildPasswordResetEmail } from "@/services/email";
+import { env } from "@/lib/env";
 import { z } from "zod";
 
 const schema = z.object({ email: z.string().email() });
@@ -38,8 +39,7 @@ export async function POST(req: NextRequest) {
     data: { userId: user.id, tokenHash, expiresAt, ipAddress: ip },
   });
 
-  const baseUrl = process.env.AUTH_URL || process.env.NEXTAUTH_URL || "http://localhost:3000";
-  const link = `${baseUrl}/reset-password?token=${raw}`;
+  const link = `${env.AUTH_URL}/reset-password?token=${raw}`;
 
   await sendEmail({
     to: email,

@@ -7,6 +7,7 @@ import {
   getDecryptedGoogleTokens,
   refreshEncryptedAccessToken,
 } from "@/services/google/tokens";
+import { env } from "@/lib/env";
 
 function encodeSubject(subject: string) {
   return `=?UTF-8?B?${Buffer.from(subject, "utf-8").toString("base64")}?=`;
@@ -46,7 +47,7 @@ export async function POST(
   const oauth2Client = new google.auth.OAuth2(
     process.env.GOOGLE_CLIENT_ID,
     process.env.GOOGLE_CLIENT_SECRET,
-    `${process.env.AUTH_URL}/api/auth/google/callback`
+    `${env.AUTH_URL}/api/auth/google/callback`
   );
 
   oauth2Client.setCredentials({

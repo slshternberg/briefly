@@ -3,7 +3,9 @@ import crypto from "crypto";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { rateLimit } from "@/lib/rate-limit";
+import { checkMembersLimit } from "@/lib/billing";
 import { sendEmail, buildInvitationEmail } from "@/services/email";
+import { env } from "@/lib/env";
 import { z } from "zod";
 
 const schema = z.object({
@@ -49,10 +51,10 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // Check plan member limit
-  const memberCount = await db.workspaceMember.count({ where: { workspaceId } });
-  if (memberCount >= 10) {
-    return NextResponse.json({ error: "הגעת למגבלת חברי הסביבה" }, { status: 402 });
+  // Check plan member limit via billing
+  const membersLimitError = await checkMembersLimit(workspaceId);
+  if (membersLimitError) {
+    return NextResponse.json({ error: membersLimitError }, { status: 402 });
   }
 
   const raw = crypto.randomBytes(32).toString("hex");
@@ -66,8 +68,7 @@ export async function POST(req: NextRequest) {
   const workspace = await db.workspace.findUnique({ where: { id: workspaceId }, select: { name: true } });
   const inviter = await db.user.findUnique({ where: { id: session.user.id }, select: { name: true } });
 
-  const baseUrl = process.env.AUTH_URL || process.env.NEXTAUTH_URL || "http://localhost:3000";
-  const link = `${baseUrl}/join?token=${raw}`;
+  const link = `${env.AUTH_URL}/join?token=${raw}`;
 
   await sendEmail({
     to: email,
