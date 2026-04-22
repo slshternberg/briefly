@@ -10,7 +10,7 @@ function getClient(): GoogleGenAI {
 }
 
 function getModel(): string {
-  return process.env.GEMINI_MODEL || "gemini-2.5-flash-preview-05-20";
+  return process.env.GEMINI_MODEL || "gemini-2.5-flash";
 }
 
 /**
