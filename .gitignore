@@ -37,6 +37,9 @@ yarn-error.log*
 # uploads (local dev storage)
 /uploads
 
+# logs (runtime operator diagnostics — orphan-files.log etc.)
+/logs
+
 # vercel
 .vercel
 

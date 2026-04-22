@@ -6,6 +6,27 @@ suggested fix.
 
 ---
 
+## Storage counter asymmetry: increment transactional, decrement fire-and-forget
+
+**Severity:** low  
+**Area:** `src/lib/billing.ts`, `src/services/conversation/index.ts`, `conversations/[id]/route.ts`
+
+Upload flow wraps `storageIncrementQuery` inside `db.$transaction([...])` for
+atomicity with the asset/conversation writes. Delete flow calls
+`decrementStorageUsage` via `db.$executeRaw` (needed for `GREATEST(0, ...)`),
+which cannot join a Prisma `$transaction` array — so it stays fire-and-forget.
+
+**Consequence:** concurrent upload + delete on the same workspace in the same
+period could briefly show drift until both settle. `recount-storage.ts` is the
+authoritative fix for any drift that sneaks through.
+
+**If this asymmetry bites in practice:** rewrite decrement as a non-raw Prisma
+upsert (read current value in a transaction, compute `Math.max(0, curr - n)`,
+write back). Losses the SQL-level atomicity guarantee but gains transaction
+composability.
+
+---
+
 ## storageBytesUsed drift monitoring
 
 **Severity:** low  

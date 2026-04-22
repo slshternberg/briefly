@@ -1,6 +1,8 @@
 import { db } from "@/lib/db";
 import { getStorageProvider } from "@/services/storage";
 import { AssetSourceType } from "@prisma/client";
+import { storageIncrementQuery } from "@/lib/billing";
+import { logOrphanFile } from "@/lib/orphan-files";
 
 const ALLOWED_MIME_TYPES = [
   // Audio
@@ -62,28 +64,54 @@ export async function uploadAudioAsset(params: {
     mimeType: params.mimeType,
   });
 
-  // Create asset and update conversation status in one transaction
-  const [asset] = await db.$transaction([
-    db.conversationAsset.create({
-      data: {
-        workspaceId: params.workspaceId,
-        conversationId: params.conversationId,
-        sourceType: params.sourceType,
-        originalName: params.originalName,
-        mimeType: params.mimeType,
-        sizeBytes: BigInt(sizeBytes),
-        storagePath,
-        uploadStatus: "COMPLETED",
-        durationSeconds: params.durationSeconds ?? null,
-      },
-    }),
-    db.conversation.update({
-      where: { id: params.conversationId },
-      data: { status: "UPLOADED" },
-    }),
-  ]);
+  // Defensive: we pass sizeBytes as Number to billing's increment query.
+  // This fails loudly if a future storage provider returns something unsafe
+  // rather than silently over-/under-counting billing.
+  if (!Number.isSafeInteger(sizeBytes)) {
+    throw new Error(`uploadAudioAsset: unsafe sizeBytes=${sizeBytes} from storage`);
+  }
 
-  return asset;
+  // Atomic: asset create + conversation status + storage usage increment.
+  // If any step fails, compensate by deleting the already-uploaded file.
+  try {
+    const [asset] = await db.$transaction([
+      db.conversationAsset.create({
+        data: {
+          workspaceId: params.workspaceId,
+          conversationId: params.conversationId,
+          sourceType: params.sourceType,
+          originalName: params.originalName,
+          mimeType: params.mimeType,
+          sizeBytes: BigInt(sizeBytes),
+          storagePath,
+          uploadStatus: "COMPLETED",
+          durationSeconds: params.durationSeconds ?? null,
+        },
+      }),
+      db.conversation.update({
+        where: { id: params.conversationId },
+        data: { status: "UPLOADED" },
+      }),
+      storageIncrementQuery(params.workspaceId, sizeBytes),
+    ]);
+
+    return asset;
+  } catch (dbErr) {
+    // Compensation: the file is already in storage but no DB record points
+    // to it. Delete the file. If the delete also fails → log as orphan so
+    // an operator can reconcile manually.
+    try {
+      await storage.deleteFile(storagePath);
+    } catch (delErr) {
+      await logOrphanFile({
+        storagePath,
+        workspaceId: params.workspaceId,
+        reason: "db-tx-failed",
+        error: delErr,
+      });
+    }
+    throw dbErr;
+  }
 }
 
 export async function getConversation(params: {

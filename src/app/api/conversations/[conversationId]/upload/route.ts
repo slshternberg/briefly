@@ -8,7 +8,7 @@ import {
 } from "@/services/conversation";
 import { AssetSourceType } from "@prisma/client";
 import { rateLimitUser } from "@/lib/rate-limit";
-import { checkStorageLimit, incrementStorageUsage } from "@/lib/billing";
+import { checkStorageLimit } from "@/lib/billing";
 import { logAudit } from "@/lib/audit";
 import { extractDurationSeconds } from "@/lib/duration";
 
@@ -112,10 +112,6 @@ export async function POST(
       buffer,
       durationSeconds,
     });
-
-    incrementStorageUsage(workspaceId, file.size).catch(
-      (err) => console.error("Storage usage increment failed:", err)
-    );
 
     logAudit({
       workspaceId,

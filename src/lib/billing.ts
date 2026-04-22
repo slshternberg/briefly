@@ -125,10 +125,26 @@ export async function decrementStorageUsage(workspaceId: string, fileSizeBytes: 
   `;
 }
 
+/**
+ * Standalone storage increment — runs its own upsert and awaits.
+ *
+ * Prefer `storageIncrementQuery()` when you need the operation inside a
+ * `db.$transaction([...])` (e.g., atomic upload flow) — the function below
+ * cannot join a transaction because it's already awaited.
+ */
 export async function incrementStorageUsage(workspaceId: string, fileSizeBytes: number) {
+  await storageIncrementQuery(workspaceId, fileSizeBytes);
+}
+
+/**
+ * Returns an unawaited Prisma upsert for `usage_records.storageBytesUsed`.
+ * Designed to be passed into `db.$transaction([...])` so a file upload's
+ * storage counter update is atomic with the asset/conversation writes.
+ */
+export function storageIncrementQuery(workspaceId: string, fileSizeBytes: number) {
   const start = periodStart();
   const end = periodEnd();
-  await db.usageRecord.upsert({
+  return db.usageRecord.upsert({
     where: { workspaceId_periodStart: { workspaceId, periodStart: start } },
     create: {
       workspaceId,
