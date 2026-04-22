@@ -69,19 +69,25 @@ export async function DELETE(
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
 
-    // Delete audio files from storage
+    // Atomic soft-delete: `updateMany` with the `deletedAt: null` guard means
+    // only one caller wins a concurrent DELETE race. Losers get count === 0
+    // and short-circuit without double-deleting files or double-decrementing
+    // the storage counter.
+    const result = await db.conversation.updateMany({
+      where: { id: conversationId, workspaceId, deletedAt: null },
+      data: { deletedAt: new Date() },
+    });
+
+    if (result.count === 0) {
+      return NextResponse.json({ success: true });
+    }
+
+    // Winner path — delete files and decrement storage once.
     const storage = getStorageProvider();
     for (const asset of conversation.assets) {
       await storage.deleteFile(asset.storagePath);
     }
 
-    // Soft delete the conversation
-    await db.conversation.update({
-      where: { id: conversationId },
-      data: { deletedAt: new Date() },
-    });
-
-    // Decrement storage quota — fire-and-forget, never blocks the response
     const totalBytes = conversation.assets.reduce(
       (sum, a) => sum + Number(a.sizeBytes), 0
     );
