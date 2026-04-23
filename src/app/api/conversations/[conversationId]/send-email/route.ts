@@ -8,6 +8,7 @@ import {
   refreshEncryptedAccessToken,
 } from "@/services/google/tokens";
 import { env } from "@/lib/env";
+import { sendEmailSchema } from "@/lib/validations/conversation";
 
 function encodeSubject(subject: string) {
   return `=?UTF-8?B?${Buffer.from(subject, "utf-8").toString("base64")}?=`;
@@ -19,13 +20,19 @@ export async function POST(
 ) {
   const { session, workspace } = await requireAuth();
   const { conversationId } = await params;
-  const { to, subject, body } = await req.json();
 
-  // Validate email address
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  if (!to || !emailRegex.test(to)) {
-    return NextResponse.json({ error: "Invalid recipient email" }, { status: 400 });
+  let rawBody: unknown;
+  try { rawBody = await req.json(); } catch {
+    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
   }
+  const parsed = sendEmailSchema.safeParse(rawBody);
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: parsed.error.issues[0]?.message || "Invalid request" },
+      { status: 400 }
+    );
+  }
+  const { to, subject, body } = parsed.data;
 
   // Verify conversation belongs to this workspace (IDOR protection)
   const conversation = await db.conversation.findFirst({

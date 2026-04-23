@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { joinInvitationSchema } from "@/lib/validations/workspace";
 
 export async function POST(req: NextRequest) {
   const session = await auth();
@@ -14,10 +15,14 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
   }
 
-  const token = (body as { token?: string }).token;
-  if (!token || typeof token !== "string") {
-    return NextResponse.json({ error: "Token required" }, { status: 400 });
+  const parsed = joinInvitationSchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: parsed.error.issues[0]?.message || "Invalid request" },
+      { status: 400 }
+    );
   }
+  const { token } = parsed.data;
 
   const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
   const invitation = await db.workspaceInvitation.findUnique({ where: { tokenHash } });
@@ -49,5 +54,5 @@ export async function POST(req: NextRequest) {
     }),
   ]);
 
-  return NextResponse.json({ workspaceId: invitation.workspaceId });
+  return NextResponse.json({ workspaceId: invitation.workspaceId, role: invitation.role });
 }

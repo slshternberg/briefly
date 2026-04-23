@@ -9,6 +9,7 @@ import {
 import { runAnalysisJob } from "@/services/analysis/worker";
 import { extractDurationSeconds } from "@/lib/duration";
 import { getStorageProvider } from "@/services/storage";
+import { processConversationSchema } from "@/lib/validations/conversation";
 
 export async function POST(
   req: Request,
@@ -35,26 +36,28 @@ export async function POST(
       return NextResponse.json({ error: limitError }, { status: 402 });
     }
 
-    // 2. Read request body
+    // 2. Read request body — all fields are optional; invalid payload → 400.
     let outputLanguage = "Hebrew";
     let conversationInstructions: string | undefined;
     let sendNotification = false;
-    try {
-      const body = await req.json();
-      if (body.outputLanguage && typeof body.outputLanguage === "string") {
-        outputLanguage = body.outputLanguage;
+    let rawBody: unknown = null;
+    try { rawBody = await req.json(); } catch {
+      // Body is optional on this route — an empty/malformed JSON falls through
+      // to defaults. We do NOT 400 here to preserve existing client behavior.
+      rawBody = null;
+    }
+    if (rawBody !== null) {
+      const parsed = processConversationSchema.safeParse(rawBody);
+      if (!parsed.success) {
+        return NextResponse.json(
+          { error: parsed.error.issues[0]?.message || "Invalid request" },
+          { status: 400 }
+        );
       }
-      if (
-        body.conversationInstructions &&
-        typeof body.conversationInstructions === "string"
-      ) {
-        conversationInstructions = body.conversationInstructions.slice(0, 3000);
-      }
-      if (body.sendNotification === true) {
-        sendNotification = true;
-      }
-    } catch {
-      // No body or invalid JSON — use defaults
+      if (parsed.data.outputLanguage) outputLanguage = parsed.data.outputLanguage;
+      if (parsed.data.conversationInstructions)
+        conversationInstructions = parsed.data.conversationInstructions;
+      if (parsed.data.sendNotification === true) sendNotification = true;
     }
 
     // 3. Load workspace (for custom instructions + default language)

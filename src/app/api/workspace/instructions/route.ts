@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
-
-const MAX_LENGTH = 5000;
+import { updateInstructionsSchema } from "@/lib/validations/workspace";
 
 export async function PUT(req: Request) {
   try {
@@ -11,19 +10,18 @@ export async function PUT(req: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const body = await req.json();
-    const instructions = body.instructions ?? "";
-
-    if (typeof instructions !== "string") {
-      return NextResponse.json({ error: "Invalid input" }, { status: 400 });
+    let body: unknown;
+    try { body = await req.json(); } catch {
+      return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
     }
-
-    if (instructions.length > MAX_LENGTH) {
+    const parsed = updateInstructionsSchema.safeParse(body);
+    if (!parsed.success) {
       return NextResponse.json(
-        { error: `Instructions too long (max ${MAX_LENGTH} characters)` },
+        { error: parsed.error.issues[0]?.message || "Invalid input" },
         { status: 400 }
       );
     }
+    const instructions = parsed.data.instructions;
 
     const membership = await db.workspaceMember.findUnique({
       where: {

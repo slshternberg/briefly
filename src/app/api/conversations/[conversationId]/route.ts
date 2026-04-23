@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { getStorageProvider } from "@/services/storage";
 import { logAudit } from "@/lib/audit";
 import { decrementStorageUsage } from "@/lib/billing";
+import { renameConversationSchema } from "@/lib/validations/conversation";
 
 export async function PATCH(
   req: Request,
@@ -27,12 +28,18 @@ export async function PATCH(
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
 
-    const body = await req.json();
-    const title = body.title?.trim();
-
-    if (!title || typeof title !== "string" || title.length > 200) {
-      return NextResponse.json({ error: "Invalid title" }, { status: 400 });
+    let body: unknown;
+    try { body = await req.json(); } catch {
+      return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
     }
+    const parsed = renameConversationSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: parsed.error.issues[0]?.message || "Invalid title" },
+        { status: 400 }
+      );
+    }
+    const { title } = parsed.data;
 
     await db.conversation.update({
       where: { id: conversationId },

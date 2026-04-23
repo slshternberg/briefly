@@ -3,12 +3,13 @@ import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { rateLimitUser } from "@/lib/rate-limit";
 import { checkAiQueryLimit, incrementAiQueryUsage } from "@/lib/billing";
+import { logAudit } from "@/lib/audit";
 import { chatWithConversation } from "@/services/gemini";
 import { buildConversationChatPrompt } from "@/services/ai/prompts";
 import type { ConversationAnalysis } from "@/services/gemini/schema";
+import { chatRequestSchema } from "@/lib/validations/conversation";
 
 const MAX_HISTORY_MESSAGES = 20;
-const MAX_QUESTION_LENGTH = 2000;
 
 export async function POST(
   req: Request,
@@ -37,34 +38,20 @@ export async function POST(
     }
 
     // 2. Parse body
-    let question: string;
-    let outputLanguage = "en";
-    let threadId: string | undefined;
-    try {
-      const body = await req.json();
-      question = body.question;
-      if (body.outputLanguage) outputLanguage = body.outputLanguage;
-      if (body.threadId) threadId = body.threadId;
-    } catch {
+    let rawBody: unknown;
+    try { rawBody = await req.json(); } catch {
+      return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+    }
+    const parsed = chatRequestSchema.safeParse(rawBody);
+    if (!parsed.success) {
       return NextResponse.json(
-        { error: "Invalid request body" },
+        { error: parsed.error.issues[0]?.message || "Invalid request" },
         { status: 400 }
       );
     }
-
-    if (!question || typeof question !== "string" || question.trim().length === 0) {
-      return NextResponse.json(
-        { error: "Question is required" },
-        { status: 400 }
-      );
-    }
-
-    if (question.length > MAX_QUESTION_LENGTH) {
-      return NextResponse.json(
-        { error: `Question too long (max ${MAX_QUESTION_LENGTH} characters)` },
-        { status: 400 }
-      );
-    }
+    const question = parsed.data.question;
+    const outputLanguage = parsed.data.outputLanguage ?? "en";
+    const threadId = parsed.data.threadId;
 
     // 3. Verify conversation + summary exist and belong to workspace
     const conversation = await db.conversation.findFirst({
@@ -172,6 +159,15 @@ export async function POST(
     incrementAiQueryUsage(workspaceId).catch(
       (err) => console.error("AI usage increment failed:", err)
     );
+
+    logAudit({
+      workspaceId,
+      userId,
+      action: "conversation.chat",
+      targetType: "conversation",
+      targetId: conversationId,
+      metadata: { threadId: thread.id, modelUsed: result.modelUsed },
+    });
 
     return NextResponse.json({
       threadId: thread.id,
