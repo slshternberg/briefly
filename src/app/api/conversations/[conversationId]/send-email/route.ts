@@ -67,9 +67,11 @@ export async function POST(
     }
   });
 
-  // Load audio asset (optional attachment)
+  // Load audio asset (optional attachment). Filter by workspaceId as defense in depth:
+  // the conversation is already workspace-scoped above, but a mismatched asset row
+  // (e.g. from a bad migration) must not leak across tenants.
   const asset = await db.conversationAsset.findFirst({
-    where: { conversationId },
+    where: { conversationId, workspaceId: workspace.id },
     select: { storagePath: true, originalName: true, mimeType: true },
   });
 
