@@ -1,65 +1,39 @@
-import { RateLimiterMemory } from "rate-limiter-flexible";
 import { NextRequest, NextResponse } from "next/server";
 import { logAudit } from "@/lib/audit";
+import { createLimiter } from "@/lib/rate-limiter-store";
 
-// Register: max 5 attempts per hour per IP
-const registerLimiter = new RateLimiterMemory({
-  points: 5,
-  duration: 60 * 60, // 1 hour
+// All limiters share the same memory-backed store — see rate-limiter-store.ts
+// for the explicit production limitation and the swap-to-Redis upgrade path.
+const registerLimiter = createLimiter({
+  points: 5, durationSec: 60 * 60, label: "auth/register",
+});
+const loginLimiter = createLimiter({
+  points: 10, durationSec: 60 * 15, label: "auth/login",
+});
+const passwordResetLimiter = createLimiter({
+  points: 3, durationSec: 60 * 60, label: "auth/password-reset",
 });
 
-// Login: max 10 attempts per 15 minutes per IP
-const loginLimiter = new RateLimiterMemory({
-  points: 10,
-  duration: 60 * 15, // 15 minutes
+const processLimiter = createLimiter({
+  points: 20, durationSec: 60 * 60, label: "conversation/process",
 });
-
-// Process (Gemini analysis): max 20 per hour per user
-const processLimiter = new RateLimiterMemory({
-  points: 20,
-  duration: 60 * 60,
+const chatLimiter = createLimiter({
+  points: 60, durationSec: 60 * 60, label: "conversation/chat",
 });
-
-// Chat: max 60 per hour per user
-const chatLimiter = new RateLimiterMemory({
-  points: 60,
-  duration: 60 * 60,
+const uploadLimiter = createLimiter({
+  points: 30, durationSec: 60 * 60, label: "conversation/upload",
 });
-
-// Upload: max 30 per hour per user
-const uploadLimiter = new RateLimiterMemory({
-  points: 30,
-  duration: 60 * 60,
+const sendEmailLimiter = createLimiter({
+  points: 20, durationSec: 60 * 60, label: "conversation/send-email",
 });
-
-// Gmail send via our UI: max 20 per hour per user
-const sendEmailLimiter = new RateLimiterMemory({
-  points: 20,
-  duration: 60 * 60,
+const styleUploadLimiter = createLimiter({
+  points: 10, durationSec: 60 * 60, label: "style/upload",
 });
-
-// Style example upload: max 10 per hour per user (audio upload + quota)
-const styleUploadLimiter = new RateLimiterMemory({
-  points: 10,
-  duration: 60 * 60,
+const styleProcessLimiter = createLimiter({
+  points: 15, durationSec: 60 * 60, label: "style/process",
 });
-
-// Style example processing (Gemini audio analysis): max 15 per hour per user
-const styleProcessLimiter = new RateLimiterMemory({
-  points: 15,
-  duration: 60 * 60,
-});
-
-// Style profile generation (Gemini call, workspace-scoped): max 6 per hour per user
-const styleProfileLimiter = new RateLimiterMemory({
-  points: 6,
-  duration: 60 * 60,
-});
-
-// Password reset / email verify: max 3 per hour per IP
-const passwordResetLimiter = new RateLimiterMemory({
-  points: 3,
-  duration: 60 * 60,
+const styleProfileLimiter = createLimiter({
+  points: 6, durationSec: 60 * 60, label: "style/profile",
 });
 
 function getIP(req: NextRequest): string {
@@ -103,7 +77,7 @@ export type UserRateLimitType =
   | "styleProcess"
   | "styleProfile";
 
-const USER_LIMITERS: Record<UserRateLimitType, RateLimiterMemory> = {
+const USER_LIMITERS = {
   process: processLimiter,
   chat: chatLimiter,
   upload: uploadLimiter,
@@ -111,7 +85,7 @@ const USER_LIMITERS: Record<UserRateLimitType, RateLimiterMemory> = {
   styleUpload: styleUploadLimiter,
   styleProcess: styleProcessLimiter,
   styleProfile: styleProfileLimiter,
-};
+} as const;
 
 export interface RateLimitAuditCtx {
   workspaceId: string;
