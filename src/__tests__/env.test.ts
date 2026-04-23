@@ -95,3 +95,37 @@ describe("env validation", () => {
     expect(mod.env.SMTP_SECURE).toBe("true");
   });
 });
+
+describe("SR-8: build-phase validation is strict on format, lenient on missing", () => {
+  it("under NEXT_PHASE=phase-production-build: allows ALL vars missing", async () => {
+    // CI without a .env should still compile.
+    applyEnv({});
+    process.env.NEXT_PHASE = "phase-production-build";
+    await expect(import("@/lib/env")).resolves.toBeDefined();
+  });
+
+  it("under NEXT_PHASE=phase-production-build: STILL fails when AUTH_SECRET is present but too short", async () => {
+    // Operator typo'd the secret — build must not silently accept it.
+    applyEnv({ ...VALID_ENV, AUTH_SECRET: "short" });
+    process.env.NEXT_PHASE = "phase-production-build";
+    await expect(import("@/lib/env")).rejects.toThrow(/Invalid environment/);
+  });
+
+  it("under NEXT_PHASE=phase-production-build: STILL fails when ENCRYPTION_KEY is non-hex", async () => {
+    applyEnv({ ...VALID_ENV, ENCRYPTION_KEY: "z".repeat(64) });
+    process.env.NEXT_PHASE = "phase-production-build";
+    await expect(import("@/lib/env")).rejects.toThrow(/Invalid environment/);
+  });
+
+  it("under NEXT_PHASE=phase-production-build: STILL fails when AUTH_URL is not a URL", async () => {
+    applyEnv({ ...VALID_ENV, AUTH_URL: "not-a-url" });
+    process.env.NEXT_PHASE = "phase-production-build";
+    await expect(import("@/lib/env")).rejects.toThrow(/Invalid environment/);
+  });
+
+  it("under NEXT_PHASE=phase-production-build: STILL fails when SMTP_USER is not an email", async () => {
+    applyEnv({ ...VALID_ENV, SMTP_USER: "not-an-email" });
+    process.env.NEXT_PHASE = "phase-production-build";
+    await expect(import("@/lib/env")).rejects.toThrow(/Invalid environment/);
+  });
+});

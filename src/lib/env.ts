@@ -25,11 +25,49 @@ const envSchema = z.object({
 
 const parsed = envSchema.safeParse(process.env);
 
+/**
+ * Classify a Zod issue as "the variable was not set" vs "the variable was
+ * set but malformed". Used to decide whether to fail the build.
+ *
+ * Before SR-8 we masked ALL issues during `next build` so CI without a
+ * full .env could still compile. That also hid *format* problems — a
+ * typo'd AUTH_SECRET or a hand-edited ENCRYPTION_KEY that isn't hex went
+ * undetected until the process hit its first request in production.
+ *
+ * Now we mask ONLY missing values during build; any malformed value
+ * (too short, wrong regex, wrong enum, not a URL, not an email) still
+ * breaks the build so the bad string never reaches production.
+ *
+ * We classify by looking up the original value at the failing path in
+ * process.env — if it's undefined the variable truly isn't set; anything
+ * else (even the empty string) is malformed and should fail the build.
+ */
+function isMissingValueIssue(
+  issue: { code: string; path: PropertyKey[] },
+  source: Record<string, string | undefined>
+): boolean {
+  if (issue.code !== "invalid_type") return false;
+  const topKey = issue.path[0];
+  if (typeof topKey !== "string") return false;
+  return source[topKey] === undefined;
+}
+
 if (!parsed.success) {
-  console.error("Missing/invalid environment variables:", parsed.error.flatten().fieldErrors);
-  // During `next build` the server modules are loaded without runtime env vars.
-  // Throw only at runtime so the build succeeds in CI / dev without a full .env.
-  if (process.env.NEXT_PHASE !== "phase-production-build") {
+  const issues = parsed.error.issues;
+  console.error(
+    "Missing/invalid environment variables:",
+    parsed.error.flatten().fieldErrors
+  );
+
+  const isBuild = process.env.NEXT_PHASE === "phase-production-build";
+  const onlyMissing = issues.every((i) =>
+    isMissingValueIssue(i, process.env as Record<string, string | undefined>)
+  );
+
+  // Runtime: always throw (same behaviour as before).
+  // Build + a formatting error: throw, so the bad string fails the pipeline.
+  // Build + only-missing: let it through so CI without a full .env compiles.
+  if (!isBuild || !onlyMissing) {
     throw new Error("Invalid environment variables. Check server logs.");
   }
 }
