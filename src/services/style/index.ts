@@ -2,15 +2,12 @@ import { db } from "@/lib/db";
 import { getStorageProvider } from "@/services/storage";
 import type { StyleProfile } from "./types";
 import { GoogleGenAI } from "@google/genai";
+import { withModelFallback } from "@/services/gemini";
 
 function getClient(): GoogleGenAI {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new Error("GEMINI_API_KEY not set");
   return new GoogleGenAI({ apiKey });
-}
-
-function getModel(): string {
-  return process.env.GEMINI_MODEL || "gemini-2.5-flash";
 }
 
 /**
@@ -34,7 +31,6 @@ export async function processStyleExample(exampleId: string, workspaceId: string
 
   try {
     const ai = getClient();
-    const model = getModel();
     const storage = getStorageProvider();
 
     // Local storage: pass file path so the Gemini SDK streams it directly.
@@ -66,21 +62,22 @@ export async function processStyleExample(exampleId: string, workspaceId: string
 
     if (file.state === "FAILED") throw new Error("File processing failed");
 
-    // Analyze the example pair
-    const response = await ai.models.generateContent({
-      model,
-      contents: [
-        {
-          role: "user",
-          parts: [
-            {
-              fileData: {
-                fileUri: file.uri!,
-                mimeType: example.audioMimeType,
+    // Analyze the example pair (with automatic fallback on overload)
+    const { result: response } = await withModelFallback((activeModel) =>
+      ai.models.generateContent({
+        model: activeModel,
+        contents: [
+          {
+            role: "user",
+            parts: [
+              {
+                fileData: {
+                  fileUri: file.uri!,
+                  mimeType: example.audioMimeType,
+                },
               },
-            },
-            {
-              text: `I'm analyzing a business conversation and the follow-up email that was sent afterward.
+              {
+                text: `I'm analyzing a business conversation and the follow-up email that was sent afterward.
 
 Here is the email that was sent after this conversation:
 
@@ -108,15 +105,16 @@ Analyze the RELATIONSHIP between this conversation and the email that followed. 
 }
 
 Return ONLY valid JSON. Base your analysis STRICTLY on the actual audio and email content.`,
-            },
-          ],
+              },
+            ],
+          },
+        ],
+        config: {
+          responseMimeType: "application/json",
+          temperature: 0.2,
         },
-      ],
-      config: {
-        responseMimeType: "application/json",
-        temperature: 0.2,
-      },
-    });
+      })
+    );
 
     const rawText = response.text ?? "";
     let extractedProfile;
@@ -165,20 +163,20 @@ export async function generateStyleProfile(workspaceId: string): Promise<StylePr
   }
 
   const ai = getClient();
-  const model = getModel();
 
   const exampleSummaries = examples.map((e, i) =>
     `Example ${i + 1} (${e.title}):\n${JSON.stringify(e.extractedProfile, null, 2)}`
   ).join("\n\n---\n\n");
 
-  const response = await ai.models.generateContent({
-    model,
-    contents: [
-      {
-        role: "user",
-        parts: [
-          {
-            text: `I have analyzed ${examples.length} pairs of business conversations and the follow-up emails that were sent afterward. Below are the extracted style observations from each pair.
+  const { result: response } = await withModelFallback((activeModel) =>
+    ai.models.generateContent({
+      model: activeModel,
+      contents: [
+        {
+          role: "user",
+          parts: [
+            {
+              text: `I have analyzed ${examples.length} pairs of business conversations and the follow-up emails that were sent afterward. Below are the extracted style observations from each pair.
 
 ${exampleSummaries}
 
@@ -209,15 +207,16 @@ Based on ALL these examples, generate a MERGED style profile that captures the u
 }
 
 Return ONLY valid JSON. Identify CONSISTENT patterns across all examples — ignore one-off variations.`,
-          },
-        ],
+            },
+          ],
+        },
+      ],
+      config: {
+        responseMimeType: "application/json",
+        temperature: 0.2,
       },
-    ],
-    config: {
-      responseMimeType: "application/json",
-      temperature: 0.2,
-    },
-  });
+    })
+  );
 
   const rawText = response.text ?? "";
   let profile: StyleProfile;
@@ -265,4 +264,19 @@ export async function getActiveStyleProfile(workspaceId: string): Promise<StyleP
 
   if (!profile) return null;
   return profile.profileJson as unknown as StyleProfile;
+}
+
+/**
+ * Identifier the client polls on to detect that a new profile has been generated.
+ * Changes when a new StyleProfile row is activated.
+ */
+export async function getActiveStyleProfileStamp(
+  workspaceId: string
+): Promise<string | null> {
+  const profile = await db.styleProfile.findFirst({
+    where: { workspaceId, isActive: true },
+    orderBy: { createdAt: "desc" },
+    select: { id: true },
+  });
+  return profile?.id ?? null;
 }

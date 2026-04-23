@@ -45,6 +45,16 @@ vi.mock("@/lib/db", () => ({
 }));
 
 vi.mock("@google/genai", () => ({
+  Type: {
+    TYPE_UNSPECIFIED: "TYPE_UNSPECIFIED",
+    STRING: "STRING",
+    NUMBER: "NUMBER",
+    INTEGER: "INTEGER",
+    BOOLEAN: "BOOLEAN",
+    ARRAY: "ARRAY",
+    OBJECT: "OBJECT",
+    NULL: "NULL",
+  },
   GoogleGenAI: vi.fn().mockImplementation(() => ({
     files: {
       upload: mockFilesUpload,

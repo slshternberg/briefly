@@ -5,7 +5,8 @@ import { processStyleExample } from "@/services/style";
 import { getStorageProvider } from "@/services/storage";
 import { decrementStorageUsage } from "@/lib/billing";
 
-/** POST — process a style example (analyze the pair with Gemini) */
+/** POST — kick off style-example analysis (runs in background).
+ *  Client polls GET /api/workspace/style-examples until the row leaves PROCESSING. */
 export async function POST(
   _req: Request,
   { params }: { params: Promise<{ exampleId: string }> }
@@ -19,21 +20,24 @@ export async function POST(
     const { exampleId } = await params;
     const workspaceId = session.user.activeWorkspaceId;
 
-    const result = await processStyleExample(exampleId, workspaceId);
-
-    return NextResponse.json({ status: "COMPLETED", extractedProfile: result });
-  } catch (error) {
-    console.error("Process style example error:", error);
-    const raw = error instanceof Error ? error.message : String(error);
-
-    let errorCode = "processing_failed";
-    if (raw.includes("503") || raw.includes("UNAVAILABLE") || raw.includes("high demand")) {
-      errorCode = "overloaded";
-    } else if (raw.includes("429") || raw.includes("RESOURCE_EXHAUSTED") || raw.includes("quota")) {
-      errorCode = "quota_exceeded";
+    // Atomically flip to PROCESSING + verify ownership in one query.
+    const updated = await db.styleExample.updateMany({
+      where: { id: exampleId, workspaceId },
+      data: { status: "PROCESSING" },
+    });
+    if (updated.count === 0) {
+      return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
 
-    return NextResponse.json({ error: errorCode }, { status: 500 });
+    // Fire-and-forget: service handles COMPLETED/FAILED transitions internally.
+    processStyleExample(exampleId, workspaceId).catch((err) => {
+      console.error("Process style example error:", err);
+    });
+
+    return NextResponse.json({ status: "PROCESSING" });
+  } catch (error) {
+    console.error("Process style example error:", error);
+    return NextResponse.json({ error: "processing_failed" }, { status: 500 });
   }
 }
 

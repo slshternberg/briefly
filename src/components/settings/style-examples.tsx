@@ -39,6 +39,7 @@ export function StyleExamples({ canEdit }: { canEdit: boolean }) {
   };
   const [examples, setExamples] = useState<StyleExample[]>([]);
   const [profile, setProfile] = useState<StyleProfileData | null>(null);
+  const [profileStamp, setProfileStamp] = useState<string | null>(null);
   const [exampleCount, setExampleCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
@@ -52,10 +53,6 @@ export function StyleExamples({ canEdit }: { canEdit: boolean }) {
   const [emailBody, setEmailBody] = useState("");
   const [notes, setNotes] = useState("");
   const [file, setFile] = useState<File | null>(null);
-
-  useEffect(() => {
-    loadData();
-  }, []);
 
   async function loadData() {
     setLoading(true);
@@ -71,6 +68,7 @@ export function StyleExamples({ canEdit }: { canEdit: boolean }) {
       if (profRes.ok) {
         const data = await profRes.json();
         setProfile(data.profile || null);
+        setProfileStamp(data.profileStamp || null);
         setExampleCount(data.exampleCount || 0);
       }
     } catch {
@@ -78,6 +76,21 @@ export function StyleExamples({ canEdit }: { canEdit: boolean }) {
     }
     setLoading(false);
   }
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    loadData();
+  }, []);
+
+  // Poll while any example is PROCESSING — reflects background job progress.
+  const hasProcessingExample = examples.some((ex) => ex.status === "PROCESSING");
+  useEffect(() => {
+    if (!hasProcessingExample) return;
+    const id = setInterval(() => {
+      void loadData();
+    }, 3000);
+    return () => clearInterval(id);
+  }, [hasProcessingExample]);
 
   async function handleUpload(e: React.FormEvent) {
     e.preventDefault();
@@ -128,15 +141,7 @@ export function StyleExamples({ canEdit }: { canEdit: boolean }) {
         method: "POST",
       });
       if (!res.ok) {
-        const data = await res.json();
-        const code = data.error || "processing_failed";
-        if (code === "overloaded") {
-          setError("שרת ה-AI עמוס כרגע — נסי שוב בעוד כמה דקות");
-        } else if (code === "quota_exceeded") {
-          setError("המכסה היומית של ה-AI הסתיימה — נסי שוב מחר");
-        } else {
-          setError(labels.processingFailed);
-        }
+        setError(labels.processingFailed);
       }
       await loadData();
     } catch {
@@ -159,6 +164,9 @@ export function StyleExamples({ canEdit }: { canEdit: boolean }) {
   async function generateProfile() {
     setGenerating(true);
     setError("");
+
+    const baselineStamp = profileStamp;
+
     try {
       const res = await fetch("/api/workspace/style-profile", {
         method: "POST",
@@ -169,7 +177,28 @@ export function StyleExamples({ canEdit }: { canEdit: boolean }) {
         setGenerating(false);
         return;
       }
-      await loadData();
+
+      // Poll until a new profile row is activated, or give up after ~2 minutes.
+      const deadline = Date.now() + 120_000;
+      while (Date.now() < deadline) {
+        await new Promise((r) => setTimeout(r, 3000));
+        try {
+          const pollRes = await fetch("/api/workspace/style-profile");
+          if (pollRes.ok) {
+            const data = await pollRes.json();
+            if (data.profileStamp && data.profileStamp !== baselineStamp) {
+              setProfile(data.profile || null);
+              setProfileStamp(data.profileStamp);
+              setExampleCount(data.exampleCount || 0);
+              setGenerating(false);
+              return;
+            }
+          }
+        } catch {
+          // Transient poll failure — keep trying.
+        }
+      }
+      setError(labels.generationFailed);
     } catch {
       setError(labels.generationFailed);
     }

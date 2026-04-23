@@ -43,7 +43,7 @@ function isRetriableError(error: unknown): boolean {
   );
 }
 
-async function withModelFallback<T>(
+export async function withModelFallback<T>(
   fn: (model: string) => Promise<T>
 ): Promise<{ result: T; modelUsed: string }> {
   // Try primary model first
@@ -371,22 +371,24 @@ export async function chatWithConversation(
 ): Promise<ChatResult> {
   const ai = getClient();
 
-  const response = await ai.models.generateContent({
-    model: PRIMARY_MODEL,
-    contents: params.contents,
-    config: {
-      systemInstruction: params.systemInstruction,
-      temperature: 0.4,
-      maxOutputTokens: 1024,
-    },
-  });
+  const { result: response, modelUsed } = await withModelFallback((model) =>
+    ai.models.generateContent({
+      model,
+      contents: params.contents,
+      config: {
+        systemInstruction: params.systemInstruction,
+        temperature: 0.4,
+        maxOutputTokens: 1024,
+      },
+    })
+  );
 
   const text = response.text ?? "";
   const usage = response.usageMetadata;
 
   return {
     response: text,
-    modelUsed: PRIMARY_MODEL,
+    modelUsed,
     promptTokens: usage?.promptTokenCount ?? null,
     outputTokens: usage?.candidatesTokenCount ?? null,
   };
