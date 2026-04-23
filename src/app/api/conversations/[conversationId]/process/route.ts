@@ -74,7 +74,8 @@ export async function POST(
       outputLanguage = workspace?.defaultLanguage || "Hebrew";
     }
 
-    // 4. Validate conversation
+    // 4. Validate conversation (read only — the authoritative status transition
+    //    happens atomically further down to prevent concurrent duplicate jobs).
     const conversation = await db.conversation.findFirst({
       where: { id: conversationId, workspaceId, deletedAt: null },
     });
@@ -86,8 +87,8 @@ export async function POST(
       );
     }
 
-    const allowedStatuses = ["UPLOADED", "FAILED", "COMPLETED"];
-    if (!allowedStatuses.includes(conversation.status)) {
+    const allowedStatuses = ["UPLOADED", "FAILED", "COMPLETED"] as const;
+    if (!allowedStatuses.includes(conversation.status as typeof allowedStatuses[number])) {
       return NextResponse.json(
         {
           error: `Cannot process conversation in "${conversation.status}" status.`,
@@ -142,11 +143,26 @@ export async function POST(
       return NextResponse.json({ error: audioLimitError }, { status: 402 });
     }
 
-    // 6. Mark as PROCESSING — visible to the client immediately
-    await db.conversation.update({
-      where: { id: conversationId },
+    // 6. SR-4: atomic transition to PROCESSING. Only the caller whose
+    //    updateMany matches the conversation IN {UPLOADED, FAILED, COMPLETED}
+    //    wins; concurrent callers see count === 0 and short-circuit with 409.
+    //    This prevents double-billing / duplicate notifications / summary
+    //    races from rapid re-clicks or a retrying client.
+    const transition = await db.conversation.updateMany({
+      where: {
+        id: conversationId,
+        workspaceId,
+        deletedAt: null,
+        status: { in: ["UPLOADED", "FAILED", "COMPLETED"] },
+      },
       data: { status: "PROCESSING" },
     });
+    if (transition.count === 0) {
+      return NextResponse.json(
+        { error: "Conversation is already being processed" },
+        { status: 409 }
+      );
+    }
 
     // 7. Run the analysis in the background.
     //    The HTTP response returns immediately; the job continues in the same
