@@ -46,6 +46,7 @@ export class S3StorageProvider implements StorageProvider {
   }
 
   // S3 files don't have a local path — always use getFileBuffer instead
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   getFilePath(_storagePath: string): string {
     throw new Error("S3StorageProvider: use getFileBuffer() instead of getFilePath()");
   }

@@ -1,13 +1,16 @@
-import { DefaultSession } from "next-auth";
 import { WorkspaceMemberRole } from "@prisma/client";
 
 declare module "next-auth" {
   interface Session {
     user: {
       id: string;
+      name: string | null;
+      email: string | null;
+      image: string | null;
+      emailVerified: boolean;
       activeWorkspaceId: string;
       activeWorkspaceRole: WorkspaceMemberRole;
-    } & DefaultSession["user"];
+    };
   }
 }
 
@@ -16,5 +19,6 @@ declare module "next-auth/jwt" {
     id: string;
     activeWorkspaceId: string;
     activeWorkspaceRole: WorkspaceMemberRole;
+    emailVerified: boolean;
   }
 }

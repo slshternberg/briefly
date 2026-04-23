@@ -2,7 +2,7 @@ import { requireAuth } from "@/lib/auth-guard";
 import { listConversations } from "@/services/conversation";
 import Link from "next/link";
 import { ConversationList } from "@/components/conversations/conversation-list";
-import { getLabels, isRTL } from "@/lib/ui-labels";
+import { getLabels } from "@/lib/ui-labels";
 import { db } from "@/lib/db";
 
 export default async function DashboardPage() {
@@ -13,12 +13,22 @@ export default async function DashboardPage() {
 
   const periodStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
 
-  const [conversations, usage] = await Promise.all([
+  const [conversations, usage, subscription] = await Promise.all([
     listConversations({ workspaceId: workspace.id }),
     db.usageRecord.findFirst({
       where: { workspaceId: workspace.id, periodStart },
     }),
+    db.subscription.findFirst({
+      where: { workspaceId: workspace.id, status: { in: ["ACTIVE", "TRIALING"] } },
+      include: { plan: true },
+      orderBy: { createdAt: "desc" },
+    }),
   ]);
+
+  const planName = subscription?.plan.name ?? labels.freePlan;
+  const convLimit = subscription?.plan.maxConversationsPerMonth ?? 10;
+  const audioMinLimit = subscription?.plan.maxAudioMinutesPerMonth ?? 120;
+  const aiLimit = subscription?.plan.maxAiQueriesPerMonth ?? 50;
 
   const serialized = conversations.map((c) => ({
     id: c.id,
@@ -74,39 +84,36 @@ export default async function DashboardPage() {
         <ConversationList conversations={serialized} />
       )}
 
-      {/* Plan card (Fix #6: tooltip on upgrade) */}
+      {/* Plan card */}
       <div className="mt-8 rounded-xl border border-border bg-card/60 p-6">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between mb-4">
           <div>
-            <h3 className="font-semibold">{labels.freePlan}</h3>
-            <p className="text-sm text-muted-foreground mt-1">
+            <h3 className="font-semibold">{planName}</h3>
+            <p className="text-sm text-muted-foreground mt-0.5">
               {workspace._count.members} {labels.memberCount}
             </p>
           </div>
-          <div className="relative group">
-            <button
-              disabled
-              className="px-4 py-2 rounded-lg border border-border text-sm font-medium opacity-50 cursor-not-allowed"
+          {!subscription && (
+            <Link
+              href="/dashboard/settings"
+              className="px-4 py-2 rounded-lg text-sm font-semibold brand-gradient text-white glow-orange transition-all hover:scale-[1.02]"
             >
               {labels.upgradeToPro}
-            </button>
-            <div className="absolute bottom-full right-0 mb-2 px-3 py-1.5 rounded-lg bg-card border border-border text-xs text-muted-foreground whitespace-nowrap opacity-0 group-hover:opacity-100 transition pointer-events-none shadow-lg">
-              {labels.comingSoon}
-            </div>
-          </div>
+            </Link>
+          )}
         </div>
-        <div className="mt-4 grid grid-cols-3 gap-4 text-sm">
+        <div className="grid grid-cols-3 gap-4 text-sm">
           <div>
             <div className="text-muted-foreground">{labels.conversationsUsage}</div>
-            <div className="font-medium mt-0.5">{usage?.conversationCount ?? 0} / 10</div>
+            <div className="font-medium mt-0.5">{usage?.conversationCount ?? 0} / {convLimit}</div>
           </div>
           <div>
             <div className="text-muted-foreground">{labels.audioMinutes}</div>
-            <div className="font-medium mt-0.5">{Math.round((usage?.audioSecondsUsed ?? 0) / 60)} / 120</div>
+            <div className="font-medium mt-0.5">{Math.round((usage?.audioSecondsUsed ?? 0) / 60)} / {audioMinLimit}</div>
           </div>
           <div>
             <div className="text-muted-foreground">{labels.aiQueries}</div>
-            <div className="font-medium mt-0.5">{usage?.aiQueryCount ?? 0} / 50</div>
+            <div className="font-medium mt-0.5">{usage?.aiQueryCount ?? 0} / {aiLimit}</div>
           </div>
         </div>
       </div>

@@ -95,8 +95,19 @@ export function ConversationList({ conversations }: { conversations: Conversatio
       </div>
 
       {filtered.length === 0 ? (
-        <div className="text-center py-8 text-sm text-muted-foreground">
-          {labels.noSearchResults}
+        <div className="rounded-xl border border-dashed border-border/50 p-10 text-center">
+          <div className="w-12 h-12 mx-auto mb-3 rounded-xl bg-muted/50 flex items-center justify-center">
+            <svg className="w-6 h-6 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
+            </svg>
+          </div>
+          <p className="text-sm font-medium mb-1">{labels.noSearchResults}</p>
+          <button
+            onClick={() => { setSearch(""); setFilter("all"); }}
+            className="text-xs text-primary hover:underline mt-1"
+          >
+            {rtl ? "נקה סינון" : "Clear filters"}
+          </button>
         </div>
       ) : (
         <div className="rounded-xl border border-border divide-y divide-border">

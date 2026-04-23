@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { isRTL } from "@/lib/ui-labels";
 
@@ -48,10 +48,40 @@ export function ProcessButton({
   const [instructions, setInstructions] = useState("");
   const [showInstructions, setShowInstructions] = useState(false);
   const [sendNotification, setSendNotification] = useState(false);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const canProcess = status === "UPLOADED" || status === "FAILED";
   const isCompleted = status === "COMPLETED";
   const isProcessing = status === "PROCESSING" || processing;
+
+  // If the page loads with PROCESSING status (e.g. user refreshed mid-analysis), start polling
+  useEffect(() => {
+    if (status === "PROCESSING") startPolling();
+    return () => stopPolling();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  function startPolling() {
+    stopPolling();
+    pollRef.current = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/conversations/${conversationId}/status`);
+        if (!res.ok) return;
+        const data = await res.json() as { status: string };
+        if (data.status !== "PROCESSING") {
+          stopPolling();
+          router.refresh();
+        }
+      } catch { /* ignore */ }
+    }, 5000);
+  }
+
+  function stopPolling() {
+    if (pollRef.current) {
+      clearInterval(pollRef.current);
+      pollRef.current = null;
+    }
+  }
 
   async function handleProcess() {
     setError("");
@@ -71,12 +101,18 @@ export function ProcessButton({
         }
       );
 
-      const data = await res.json();
+      const data = await res.json() as { status?: string; error?: string };
 
       if (!res.ok) {
         setError(data.error || "processing_failed");
         setProcessing(false);
         return;
+      }
+
+      // Server returns PROCESSING immediately — poll for completion
+      if (data.status === "PROCESSING") {
+        startPolling();
+        return; // keep processing=true, stop when poll detects change
       }
 
       router.refresh();

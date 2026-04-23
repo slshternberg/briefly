@@ -18,6 +18,7 @@ function LoginForm() {
   const justVerified = searchParams.get("verified") === "true";
   const verifyError = searchParams.get("verifyError") === "true";
   const justReset = searchParams.get("reset") === "true";
+  const redirectTo = searchParams.get("redirect") ?? "";
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -41,7 +42,8 @@ function LoginForm() {
         return;
       }
 
-      router.push("/dashboard");
+      const destination = redirectTo.startsWith("/") ? redirectTo : "/dashboard";
+      router.push(destination);
       router.refresh();
     } catch {
       setError(labels.somethingWentWrong);

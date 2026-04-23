@@ -1,16 +1,18 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { signIn } from "next-auth/react";
 import { useLabels } from "@/lib/client-language";
 
-export default function RegisterPage() {
+function RegisterForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const labels = useLabels();
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const redirectTo = searchParams.get("redirect") ?? "";
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -44,11 +46,13 @@ export default function RegisterPage() {
       });
 
       if (signInResult?.error) {
-        router.push("/login?registered=true");
+        const loginRedirect = redirectTo ? `&redirect=${encodeURIComponent(redirectTo)}` : "";
+        router.push(`/login?registered=true${loginRedirect}`);
         return;
       }
 
-      router.push("/dashboard");
+      const destination = redirectTo.startsWith("/") ? redirectTo : "/dashboard";
+      router.push(destination);
       router.refresh();
     } catch {
       setError(labels.somethingWentWrong);
@@ -133,5 +137,13 @@ export default function RegisterPage() {
         </Link>
       </p>
     </div>
+  );
+}
+
+export default function RegisterPage() {
+  return (
+    <Suspense>
+      <RegisterForm />
+    </Suspense>
   );
 }

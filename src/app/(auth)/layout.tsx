@@ -24,6 +24,12 @@ export default function AuthLayout({
         <div className="rounded-2xl border border-border/60 bg-card/80 backdrop-blur-sm p-8 shadow-xl shadow-black/20">
           {children}
         </div>
+
+        <div className="flex justify-center gap-4 mt-6 text-xs text-muted-foreground">
+          <Link href="/privacy" className="hover:text-foreground transition">מדיניות פרטיות</Link>
+          <Link href="/terms" className="hover:text-foreground transition">תנאי שימוש</Link>
+          <Link href="/help" className="hover:text-foreground transition">עזרה</Link>
+        </div>
       </div>
     </div>
   );

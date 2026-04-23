@@ -252,7 +252,7 @@ export function useRecorder(maxSeconds = 7200): UseRecorderReturn {
         candidates.find((m) => MediaRecorder.isTypeSupported(m)) ??
         (hasVideo ? "video/webm" : "audio/webm");
 
-      const recorder = new MediaRecorder(stream, { mimeType });
+      const recorder = new MediaRecorder(stream, { mimeType, audioBitsPerSecond: 64000 });
 
       recorder.ondataavailable = (e) => {
         if (e.data.size > 0) chunksRef.current.push(e.data);
@@ -350,7 +350,6 @@ export function useRecorder(maxSeconds = 7200): UseRecorderReturn {
     setElapsed(0);
     setError("");
     setState("idle");
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mediaUrl]);
 
   return {

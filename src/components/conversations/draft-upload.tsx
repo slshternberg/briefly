@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useLabels } from "@/lib/client-language";
 
 const ACCEPTED_TYPES = ".mp3,.wav,.m4a,.webm,.ogg";
-const MAX_SIZE_MB = 100;
+const MAX_SIZE_MB = 500;
 
 interface DraftUploadProps {
   conversationId: string;

@@ -7,11 +7,14 @@ import { StyleExamples } from "@/components/settings/style-examples";
 import { GoogleConnectButton } from "@/components/settings/google-connect-button";
 import { DeleteAccount } from "@/components/settings/delete-account";
 import { InviteMember } from "@/components/settings/invite-member";
+import { BillingSection } from "@/components/settings/billing-section";
 
 export default async function SettingsPage() {
   const { session, workspace, role } = await requireAuth();
 
-  const [ws, user, members] = await Promise.all([
+  const periodStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+
+  const [ws, user, members, subscription, availablePlans, usage] = await Promise.all([
     db.workspace.findUnique({
       where: { id: workspace.id },
       select: { defaultLanguage: true, customInstructions: true },
@@ -25,6 +28,13 @@ export default async function SettingsPage() {
       include: { user: { select: { name: true, email: true } } },
       orderBy: { createdAt: "asc" },
     }),
+    db.subscription.findFirst({
+      where: { workspaceId: workspace.id, status: { in: ["ACTIVE", "TRIALING"] } },
+      include: { plan: true },
+      orderBy: { createdAt: "desc" },
+    }),
+    db.plan.findMany({ where: { isActive: true }, orderBy: { priceMonthly: "asc" } }),
+    db.usageRecord.findFirst({ where: { workspaceId: workspace.id, periodStart } }),
   ]);
 
   const canEdit = role === "OWNER" || role === "ADMIN";
@@ -75,7 +85,32 @@ export default async function SettingsPage() {
           <p className="text-xs text-muted-foreground mb-4">
             ניהול חברי סביבת העבודה והזמנת משתמשים חדשים.
           </p>
-          <InviteMember members={members} canInvite={canEdit} />
+          <InviteMember
+            members={members}
+            canInvite={canEdit}
+            currentUserId={session.user.id}
+          />
+        </div>
+
+        <div className="rounded-xl border border-border bg-card/60 p-6">
+          <h2 className="font-semibold mb-1">תוכנית וחיוב</h2>
+          <p className="text-xs text-muted-foreground mb-4">
+            שימוש חודשי ושדרוג תוכנית.
+          </p>
+          <BillingSection
+            subscription={subscription ? {
+              ...subscription,
+              plan: subscription.plan,
+              currentPeriodEnd: subscription.currentPeriodEnd?.toISOString() ?? null,
+            } : null}
+            usage={usage ? {
+              conversationCount: usage.conversationCount,
+              audioSecondsUsed: usage.audioSecondsUsed,
+              aiQueryCount: usage.aiQueryCount,
+            } : null}
+            availablePlans={availablePlans}
+            canManage={role === "OWNER" || role === "ADMIN"}
+          />
         </div>
 
         <div className="rounded-xl border border-border bg-card/60 p-6">

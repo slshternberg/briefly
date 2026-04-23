@@ -9,6 +9,7 @@ import { DeleteButton } from "@/components/conversations/delete-button";
 import { EditableTitle } from "@/components/conversations/editable-title";
 import { SendEmailButton } from "@/components/conversations/send-email-button";
 import { CopyButton } from "@/components/conversations/copy-button";
+import { ExportPdfButton } from "@/components/conversations/export-pdf-button";
 import type { ConversationAnalysis } from "@/services/gemini/schema";
 import { db } from "@/lib/db";
 import { getLabels, isRTL } from "@/lib/ui-labels";
@@ -199,6 +200,25 @@ export default async function ConversationDetailPage({
       {/* Analysis results */}
       {analysis && analysis.contentType !== "insufficient_content" && (
         <div className="space-y-5">
+
+          {/* Export PDF */}
+          <div className="flex justify-end">
+            <ExportPdfButton
+              title={conversation.title}
+              rtl={rtl}
+              sections={[
+                ...(customSummary ? [{ heading: labels.customSummaryTitle, content: customSummary }] : []),
+                { heading: labels.internalSummary, content: analysis.internalSummary },
+                { heading: labels.clientSummary, content: analysis.clientFriendlySummary },
+                { heading: labels.keyTopics, content: analysis.keyTopics.join("\n") },
+                { heading: labels.decisions, content: analysis.decisions.join("\n") },
+                { heading: labels.actionItems, content: analysis.actionItems.join("\n") },
+                { heading: labels.objections, content: analysis.customerObjections.join("\n") },
+                { heading: labels.followUpPromises, content: analysis.followUpPromises.join("\n") },
+                { heading: labels.openQuestions, content: analysis.openQuestions.join("\n") },
+              ]}
+            />
+          </div>
 
           {/* Custom Summary — FIRST: this is the primary output the user cares about */}
           {customSummary && (

@@ -2,18 +2,22 @@
 
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { useSession } from "next-auth/react";
 import Link from "next/link";
 
 function JoinContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { update } = useSession();
   const token = searchParams.get("token") ?? "";
 
-  const [status, setStatus] = useState<"loading" | "success" | "error">("loading");
-  const [error, setError] = useState("");
+  const [status, setStatus] = useState<"loading" | "success" | "error">(
+    !token ? "error" : "loading"
+  );
+  const [error, setError] = useState(!token ? "קישור לא תקין" : "");
 
   useEffect(() => {
-    if (!token) { setStatus("error"); setError("קישור לא תקין"); return; }
+    if (!token) return;
 
     fetch("/api/workspaces/join", {
       method: "POST",
@@ -31,11 +35,14 @@ function JoinContent() {
           setStatus("error");
           return;
         }
+        const data = await res.json() as { workspaceId: string; role?: string };
+        // Switch session to the newly joined workspace
+        await update({ activeWorkspaceId: data.workspaceId, activeWorkspaceRole: data.role ?? "MEMBER" });
         setStatus("success");
         setTimeout(() => router.push("/dashboard"), 2000);
       })
       .catch(() => { setError("משהו השתבש"); setStatus("error"); });
-  }, [token, router]);
+  }, [token, router, update]);
 
   if (status === "loading") {
     return (
