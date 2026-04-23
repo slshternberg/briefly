@@ -100,6 +100,37 @@ Not confirmed whether these were pre-existing in the repo or introduced by the n
 
 ---
 
+## Deploy note: SR-5 forces re-login for past-reset users
+
+**Severity:** informational (one-time)  
+**Area:** `src/lib/jwt-resolver.ts`
+
+The JWT callback now compares `token.iat` to `user.passwordChangedAt`. On
+the first deploy containing this code, any user who has reset their
+password in the past *before this change* will be logged out on their
+next request (their stored token's `iat` precedes the stamped reset
+time). This is the intended behaviour of the fix — called out so the
+spike of "logged out suddenly" user reports around deploy time is not a
+regression.
+
+New users and users who have never reset their password are unaffected.
+
+---
+
+## DB load from per-request session validation
+
+**Severity:** low (under 50 concurrent users)  
+**Area:** `src/lib/jwt-resolver.ts`
+
+SR-5 adds one `SELECT passwordChangedAt FROM users WHERE id = ?` per
+request that resolves the JWT (i.e. per `auth()` call). For 50
+concurrent users this is comfortably within Postgres capacity, but past
+that scale it should be cached (per-token + short TTL) or lifted to a
+Redis-backed revocation list. Tracked here so the scaling discussion
+has a named root cause.
+
+---
+
 ## CSP is not yet emitted
 
 **Severity:** low/medium  

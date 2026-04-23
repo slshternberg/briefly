@@ -6,6 +6,7 @@ import { loginSchema } from "@/lib/validations/auth";
 import { WorkspaceMemberRole } from "@prisma/client";
 import { RateLimiterMemory } from "rate-limiter-flexible";
 import { logAudit } from "@/lib/audit";
+import { resolveJwt } from "@/lib/jwt-resolver";
 
 const loginLimiter = new RateLimiterMemory({ points: 10, duration: 60 * 15 });
 
@@ -67,6 +68,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           id: user.id,
           email: user.email,
           name: user.name,
+          emailVerified: user.emailVerified,
           activeWorkspaceId: activeMembership.workspaceId,
           activeWorkspaceRole: activeMembership.role,
         };
@@ -76,12 +78,14 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   callbacks: {
     authorized({ auth, request }) {
       const isLoggedIn = !!auth?.user;
+      const emailVerified = auth?.user?.emailVerified ?? true; // default true for existing sessions without this field
       const { pathname } = request.nextUrl;
 
       const isProtected =
         pathname.startsWith("/dashboard") || pathname.startsWith("/settings");
       const isAuthPage =
         pathname.startsWith("/login") || pathname.startsWith("/register");
+      const isVerifyPage = pathname.startsWith("/verify-email");
 
       // Redirect authenticated users away from auth pages
       if (isAuthPage && isLoggedIn) {
@@ -89,25 +93,37 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       }
 
       // Block unauthenticated users from protected pages
-      if (isProtected && !isLoggedIn) {
+      if ((isProtected || isVerifyPage) && !isLoggedIn) {
         return false; // NextAuth will redirect to signIn page
+      }
+
+      // Redirect verified users away from verify-email page
+      if (isVerifyPage && isLoggedIn && emailVerified) {
+        return Response.redirect(new URL("/dashboard", request.nextUrl));
+      }
+
+      // Block unverified users from protected pages
+      if (isProtected && isLoggedIn && !emailVerified) {
+        return Response.redirect(new URL("/verify-email", request.nextUrl));
       }
 
       return true;
     },
-    async jwt({ token, user }) {
-      if (user) {
-        token.id = user.id as string;
-        token.activeWorkspaceId = (user as Record<string, unknown>)
-          .activeWorkspaceId as string;
-        token.activeWorkspaceRole = (user as Record<string, unknown>)
-          .activeWorkspaceRole as string;
-      }
-      return token;
+    async jwt({ token, user, trigger, session }) {
+      return (await resolveJwt({
+        token: token as Record<string, unknown>,
+        user: (user as Record<string, unknown>) ?? null,
+        trigger,
+        session: session as Record<string, unknown> | undefined,
+      })) as typeof token;
     },
     async session({ session, token }) {
+      if (!token || !token.id) {
+        return session;
+      }
       if (session.user) {
         session.user.id = token.id as string;
+        (session.user as { emailVerified: boolean }).emailVerified = (token.emailVerified ?? true) as boolean;
         session.user.activeWorkspaceId = token.activeWorkspaceId as string;
         session.user.activeWorkspaceRole =
           token.activeWorkspaceRole as WorkspaceMemberRole;
