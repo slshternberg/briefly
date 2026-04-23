@@ -24,26 +24,35 @@ export async function POST(req: NextRequest) {
   const { token, password } = parsed.data;
   const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
 
-  const record = await db.passwordResetToken.findUnique({ where: { tokenHash } });
+  const now = new Date();
 
-  if (!record || record.usedAt || record.expiresAt < new Date()) {
+  // SR-6: atomic consume. The `updateMany` matches at most one row (tokenHash
+  // is unique) and only when it's unused + unexpired. Two concurrent
+  // consumers see count 1 + count 0 — the loser 400s without side effects.
+  const claimed = await db.passwordResetToken.updateMany({
+    where: { tokenHash, usedAt: null, expiresAt: { gt: now } },
+    data: { usedAt: now },
+  });
+  if (claimed.count === 0) {
+    return NextResponse.json({ error: "הקישור פג תוקף או לא תקין" }, { status: 400 });
+  }
+  const record = await db.passwordResetToken.findUnique({
+    where: { tokenHash },
+    select: { id: true, userId: true },
+  });
+  if (!record) {
+    // Should be unreachable (we just matched on the unique tokenHash) but
+    // keep a graceful path for a concurrent DB migration / row-delete race.
     return NextResponse.json({ error: "הקישור פג תוקף או לא תקין" }, { status: 400 });
   }
 
   const passwordHash = await hash(password, 12);
-  const now = new Date();
 
-  const [updatedUser] = await db.$transaction([
-    db.user.update({
-      where: { id: record.userId },
-      data: { passwordHash, passwordChangedAt: now },
-      include: { memberships: { where: { role: "OWNER" }, take: 1, select: { workspaceId: true } } },
-    }),
-    db.passwordResetToken.update({
-      where: { id: record.id },
-      data: { usedAt: now },
-    }),
-  ]);
+  const updatedUser = await db.user.update({
+    where: { id: record.userId },
+    data: { passwordHash, passwordChangedAt: now },
+    include: { memberships: { where: { role: "OWNER" }, take: 1, select: { workspaceId: true } } },
+  });
 
   const workspaceId = updatedUser.memberships[0]?.workspaceId;
   if (workspaceId) {

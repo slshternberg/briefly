@@ -9,22 +9,31 @@ export async function GET(req: NextRequest) {
   }
 
   const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
-  const record = await db.emailVerificationToken.findUnique({ where: { tokenHash } });
+  const now = new Date();
 
-  if (!record || record.usedAt || record.expiresAt < new Date()) {
+  // SR-6: atomic consume. updateMany matches on unique tokenHash only when
+  // unused + unexpired; count=1 is the winner, count=0 means already used
+  // / expired / missing. The subsequent read is safe because the row is
+  // now irreversibly marked used — no second consumer can race in.
+  const claimed = await db.emailVerificationToken.updateMany({
+    where: { tokenHash, usedAt: null, expiresAt: { gt: now } },
+    data: { usedAt: now },
+  });
+  if (claimed.count === 0) {
+    return NextResponse.redirect(new URL("/login?verifyError=true", req.nextUrl));
+  }
+  const record = await db.emailVerificationToken.findUnique({
+    where: { tokenHash },
+    select: { userId: true },
+  });
+  if (!record) {
     return NextResponse.redirect(new URL("/login?verifyError=true", req.nextUrl));
   }
 
-  await db.$transaction([
-    db.user.update({
-      where: { id: record.userId },
-      data: { emailVerified: true },
-    }),
-    db.emailVerificationToken.update({
-      where: { id: record.id },
-      data: { usedAt: new Date() },
-    }),
-  ]);
+  await db.user.update({
+    where: { id: record.userId },
+    data: { emailVerified: true },
+  });
 
-  return NextResponse.redirect(new URL("/login?verified=true", req.nextUrl));
+  return NextResponse.redirect(new URL("/verified", req.nextUrl));
 }
