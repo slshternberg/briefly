@@ -100,6 +100,27 @@ Not confirmed whether these were pre-existing in the repo or introduced by the n
 
 ---
 
+## CSP is not yet emitted
+
+**Severity:** low/medium  
+**Area:** `next.config.ts`
+
+`Strict-Transport-Security`, `X-Frame-Options`, `X-Content-Type-Options`,
+`Referrer-Policy` and `Permissions-Policy` are now emitted (A.4). Content
+Security Policy was intentionally deferred: Next.js injects inline styles
+and scripts that need either `unsafe-inline` or per-request nonces, and
+Stripe Checkout / Google OAuth popups must be allowlisted carefully. A
+report-only rollout should be the first step.
+
+**Suggested fix:**
+- Add a `Content-Security-Policy-Report-Only` header with a starting
+  policy: `default-src 'self'; script-src 'self' 'unsafe-inline' https://js.stripe.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://api.stripe.com; frame-src https://js.stripe.com https://accounts.google.com; frame-ancestors 'none'`
+- Wire a reporting endpoint (or use Sentry once B.6 lands).
+- Flip to `Content-Security-Policy` enforcement after a week of clean
+  reports.
+
+---
+
 ## Conversation.durationSec is dead — consider dropping
 
 **Severity:** low  
