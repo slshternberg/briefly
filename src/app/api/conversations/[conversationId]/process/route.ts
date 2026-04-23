@@ -27,7 +27,11 @@ export async function POST(
     const workspaceId = session.user.activeWorkspaceId;
 
     // Rate limit: max 20 process calls per hour per user
-    const limited = await rateLimitUser(session.user.id, "process");
+    const limited = await rateLimitUser(session.user.id, "process", {
+      workspaceId,
+      userId: session.user.id,
+      action: "ratelimit.process",
+    });
     if (limited) return limited;
 
     // Billing: check monthly conversation limit

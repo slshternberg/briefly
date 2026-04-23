@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { getStorageProvider } from "@/services/storage";
+import { rateLimitUser } from "@/lib/rate-limit";
 
 const ALLOWED_MIME_BASES = ["audio/mpeg", "audio/wav", "audio/x-wav", "audio/mp4", "audio/x-m4a", "audio/webm", "audio/ogg"];
 const MAX_FILE_SIZE = 100 * 1024 * 1024;
@@ -37,6 +38,13 @@ export async function POST(req: Request) {
     }
 
     const workspaceId = session.user.activeWorkspaceId;
+
+    const limited = await rateLimitUser(session.user.id, "styleUpload", {
+      workspaceId,
+      userId: session.user.id,
+      action: "ratelimit.style_upload",
+    });
+    if (limited) return limited;
 
     // Check role
     const membership = await db.workspaceMember.findUnique({

@@ -9,6 +9,7 @@ import {
 } from "@/services/google/tokens";
 import { env } from "@/lib/env";
 import { sendEmailSchema } from "@/lib/validations/conversation";
+import { rateLimitUser } from "@/lib/rate-limit";
 
 function encodeSubject(subject: string) {
   return `=?UTF-8?B?${Buffer.from(subject, "utf-8").toString("base64")}?=`;
@@ -20,6 +21,13 @@ export async function POST(
 ) {
   const { session, workspace } = await requireAuth();
   const { conversationId } = await params;
+
+  const limited = await rateLimitUser(session.user.id, "sendEmail", {
+    workspaceId: workspace.id,
+    userId: session.user.id,
+    action: "ratelimit.send_email",
+  });
+  if (limited) return limited;
 
   let rawBody: unknown;
   try { rawBody = await req.json(); } catch {

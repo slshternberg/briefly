@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { processStyleExample } from "@/services/style";
 import { getStorageProvider } from "@/services/storage";
 import { decrementStorageUsage } from "@/lib/billing";
+import { rateLimitUser } from "@/lib/rate-limit";
 
 /** POST — kick off style-example analysis (runs in background).
  *  Client polls GET /api/workspace/style-examples until the row leaves PROCESSING. */
@@ -19,6 +20,13 @@ export async function POST(
 
     const { exampleId } = await params;
     const workspaceId = session.user.activeWorkspaceId;
+
+    const limited = await rateLimitUser(session.user.id, "styleProcess", {
+      workspaceId,
+      userId: session.user.id,
+      action: "ratelimit.style_process",
+    });
+    if (limited) return limited;
 
     // Atomically flip to PROCESSING + verify ownership in one query.
     const updated = await db.styleExample.updateMany({

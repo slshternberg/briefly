@@ -28,7 +28,11 @@ export async function POST(
     const userId = session.user.id;
 
     // Rate limit: max 60 chat calls per hour per user
-    const limited = await rateLimitUser(userId, "chat");
+    const limited = await rateLimitUser(userId, "chat", {
+      workspaceId,
+      userId,
+      action: "ratelimit.chat",
+    });
     if (limited) return limited;
 
     // Billing: check monthly AI query limit

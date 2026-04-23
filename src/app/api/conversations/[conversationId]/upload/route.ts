@@ -22,11 +22,15 @@ export async function POST(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const limited = await rateLimitUser(session.user.id, "upload");
-    if (limited) return limited;
-
     const { conversationId } = await params;
     const workspaceId = session.user.activeWorkspaceId;
+
+    const limited = await rateLimitUser(session.user.id, "upload", {
+      workspaceId,
+      userId: session.user.id,
+      action: "ratelimit.upload",
+    });
+    if (limited) return limited;
 
     // Verify conversation belongs to this workspace
     const conversation = await db.conversation.findFirst({

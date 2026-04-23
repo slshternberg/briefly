@@ -6,6 +6,7 @@ import {
   getActiveStyleProfile,
   getActiveStyleProfileStamp,
 } from "@/services/style";
+import { rateLimitUser } from "@/lib/rate-limit";
 
 /** GET — get the active style profile for workspace */
 export async function GET() {
@@ -42,6 +43,13 @@ export async function POST() {
     }
 
     const workspaceId = session.user.activeWorkspaceId;
+
+    const limited = await rateLimitUser(session.user.id, "styleProfile", {
+      workspaceId,
+      userId: session.user.id,
+      action: "ratelimit.style_profile",
+    });
+    if (limited) return limited;
 
     // Check role
     const membership = await db.workspaceMember.findUnique({
