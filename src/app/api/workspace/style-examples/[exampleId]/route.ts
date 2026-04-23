@@ -28,6 +28,20 @@ export async function POST(
     });
     if (limited) return limited;
 
+    // Role check (SR-2): item-level process must match the list-POST policy —
+    // only OWNER/ADMIN may kick off a Gemini analysis. Read from DB, never
+    // from the JWT (see SR-1 in docs/security/route-audit.md).
+    const membership = await db.workspaceMember.findUnique({
+      where: { workspaceId_userId: { workspaceId, userId: session.user.id } },
+      select: { role: true },
+    });
+    if (!membership || membership.role === "MEMBER") {
+      return NextResponse.json(
+        { error: "Only owners/admins can manage style examples" },
+        { status: 403 }
+      );
+    }
+
     // Atomically flip to PROCESSING + verify ownership in one query.
     const updated = await db.styleExample.updateMany({
       where: { id: exampleId, workspaceId },
@@ -62,6 +76,18 @@ export async function DELETE(
 
     const { exampleId } = await params;
     const workspaceId = session.user.activeWorkspaceId;
+
+    // Role check (SR-2): only OWNER/ADMIN may delete style examples.
+    const membership = await db.workspaceMember.findUnique({
+      where: { workspaceId_userId: { workspaceId, userId: session.user.id } },
+      select: { role: true },
+    });
+    if (!membership || membership.role === "MEMBER") {
+      return NextResponse.json(
+        { error: "Only owners/admins can manage style examples" },
+        { status: 403 }
+      );
+    }
 
     const example = await db.styleExample.findFirst({
       where: { id: exampleId, workspaceId },
