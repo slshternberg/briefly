@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { useSession } from "next-auth/react";
+import { SessionProvider, useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 
 interface Workspace {
@@ -11,7 +11,18 @@ interface Workspace {
   isCurrent: boolean;
 }
 
+// Outer: provides the session context that the inner component reads.
+// The layout renders this as a server component, so we can't rely on a
+// SessionProvider higher up the tree.
 export function WorkspaceSwitcher({ currentName }: { currentName: string }) {
+  return (
+    <SessionProvider>
+      <WorkspaceSwitcherInner currentName={currentName} />
+    </SessionProvider>
+  );
+}
+
+function WorkspaceSwitcherInner({ currentName }: { currentName: string }) {
   const { update } = useSession();
   const router = useRouter();
   const [open, setOpen] = useState(false);
