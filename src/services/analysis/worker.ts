@@ -31,7 +31,6 @@ export interface AnalysisJobParams {
   conversationInstructions?: string;
   customInstructions?: string;
   conversationTitle: string;
-  sendNotification: boolean;
 }
 
 export async function runAnalysisJob(p: AnalysisJobParams): Promise<void> {
@@ -126,7 +125,13 @@ export async function runAnalysisJob(p: AnalysisJobParams): Promise<void> {
       (err) => console.error("[analysis-worker] Usage increment failed:", err)
     );
 
-    if (p.sendNotification) {
+    // Notification preference is now workspace-level (set in settings).
+    // Read it server-side, never trust the client to opt in/out per call.
+    const ws = await db.workspace.findUnique({
+      where: { id: p.workspaceId },
+      select: { notifyOnAnalysisDone: true },
+    });
+    if (ws?.notifyOnAnalysisDone) {
       const baseUrl = env.AUTH_URL;
       sendAnalysisCompleteNotification({
         userId: p.userId,

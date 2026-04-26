@@ -60,11 +60,9 @@ describe("process conversation schema", () => {
       processConversationSchema.safeParse({ conversationInstructions: "x".repeat(3001) }).success
     ).toBe(false);
   });
-  it("rejects sendNotification as a string", () => {
-    expect(
-      processConversationSchema.safeParse({ sendNotification: "yes" }).success
-    ).toBe(false);
-  });
+  // sendNotification was removed from the schema — the toggle is now a
+  // workspace-level setting (Workspace.notifyOnAnalysisDone). Extra fields
+  // sent by old clients are ignored, not rejected.
 });
 
 describe("rename conversation schema", () => {

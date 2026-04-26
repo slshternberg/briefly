@@ -41,9 +41,10 @@ export async function POST(
     }
 
     // 2. Read request body — all fields are optional; invalid payload → 400.
+    //    Email-on-completion is no longer per-call; it lives on the workspace
+    //    (Workspace.notifyOnAnalysisDone) and is read inside the worker.
     let outputLanguage = "Hebrew";
     let conversationInstructions: string | undefined;
-    let sendNotification = false;
     let rawBody: unknown = null;
     try { rawBody = await req.json(); } catch {
       // Body is optional on this route — an empty/malformed JSON falls through
@@ -61,7 +62,6 @@ export async function POST(
       if (parsed.data.outputLanguage) outputLanguage = parsed.data.outputLanguage;
       if (parsed.data.conversationInstructions)
         conversationInstructions = parsed.data.conversationInstructions;
-      if (parsed.data.sendNotification === true) sendNotification = true;
     }
 
     // 3. Load workspace (for custom instructions + default language)
@@ -181,7 +181,6 @@ export async function POST(
       conversationInstructions,
       customInstructions: workspace?.customInstructions || undefined,
       conversationTitle: conversation.title,
-      sendNotification,
     });
 
     return NextResponse.json({ status: "PROCESSING" });

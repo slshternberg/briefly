@@ -170,7 +170,6 @@ export default async function ConversationDetailPage({
             conversationId={conversation.id}
             status={conversation.status}
             defaultLanguage={lang}
-            isGoogleConnected={isGoogleConnected}
             labels={{
               analyze: labels.analyze,
               reanalyze: labels.reanalyze,

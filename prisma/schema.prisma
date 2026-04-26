@@ -130,6 +130,7 @@ model Workspace {
   customInstructions   String?
   analysisInstructions String?
   emailInstructions    String?
+  notifyOnAnalysisDone Boolean   @default(false)
   activeStyleProfileId String?   @db.Uuid
   createdAt            DateTime  @default(now())
   updatedAt        DateTime  @updatedAt

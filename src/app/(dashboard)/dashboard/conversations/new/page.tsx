@@ -9,7 +9,7 @@ import { useLabels } from "@/lib/client-language";
 import { convertBlobToMp3 } from "@/lib/mp3-encoder";
 
 type InputMode = "choose" | "record" | "upload";
-type Phase = "creating" | "compressing" | "uploading";
+type Phase = "creating" | "compressing" | "uploading" | "analyzing";
 
 const COMPRESS_THRESHOLD_MB = 20;
 
@@ -112,6 +112,29 @@ export default function NewConversationPage() {
         setError(data.error || labels.failedToUpload);
         setUploading(false);
         return;
+      }
+
+      // Auto-trigger analysis so the user gets a single "Analyze" button
+      // instead of a two-step "Create then Analyze" flow. Whether email is
+      // sent at the end is decided by Workspace.notifyOnAnalysisDone — the
+      // process route reads it server-side from the workspace settings.
+      setPhase("analyzing");
+      const processRes = await fetch(
+        `/api/conversations/${conversation.id}/process`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({}),
+        }
+      );
+      // Don't block the redirect on a process failure — the conversation page
+      // shows a "retry" button if status === FAILED. Surface the error inline
+      // first so the user sees it before the redirect.
+      if (!processRes.ok) {
+        const data = await processRes.json().catch(() => ({}));
+        const msg =
+          (data as { error?: string }).error || labels.somethingWentWrong;
+        setError(msg);
       }
 
       router.push(`/dashboard/conversations/${conversation.id}`);
@@ -294,6 +317,15 @@ export default function NewConversationPage() {
                 </div>
               </>
             )}
+            {phase === "analyzing" && (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <svg className="w-4 h-4 animate-spin text-primary" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                </svg>
+                <span>מתחיל ניתוח...</span>
+              </div>
+            )}
           </div>
         )}
 
@@ -308,8 +340,10 @@ export default function NewConversationPage() {
                 ? labels.creatingConversation
                 : phase === "compressing"
                   ? "מכווץ קובץ..."
-                  : `מעלה... ${uploadProgress}%`
-              : labels.createConversation}
+                  : phase === "analyzing"
+                    ? "מתחיל ניתוח..."
+                    : `מעלה... ${uploadProgress}%`
+              : "נתח שיחה"}
           </button>
         )}
       </form>

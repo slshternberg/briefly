@@ -8,6 +8,7 @@ import { GoogleConnectButton } from "@/components/settings/google-connect-button
 import { DeleteAccount } from "@/components/settings/delete-account";
 import { InviteMember } from "@/components/settings/invite-member";
 import { BillingSection } from "@/components/settings/billing-section";
+import { NotificationToggle } from "@/components/settings/notification-toggle";
 
 export default async function SettingsPage() {
   const { session, workspace, role } = await requireAuth();
@@ -17,7 +18,11 @@ export default async function SettingsPage() {
   const [ws, user, members, subscription, availablePlans, usage] = await Promise.all([
     db.workspace.findUnique({
       where: { id: workspace.id },
-      select: { defaultLanguage: true, customInstructions: true },
+      select: {
+        defaultLanguage: true,
+        customInstructions: true,
+        notifyOnAnalysisDone: true,
+      },
     }),
     db.user.findUnique({
       where: { id: session.user.id },
@@ -110,6 +115,17 @@ export default async function SettingsPage() {
             } : null}
             availablePlans={availablePlans}
             canManage={role === "OWNER" || role === "ADMIN"}
+          />
+        </div>
+
+        <div className="rounded-xl border border-border bg-card/60 p-6">
+          <h2 className="font-semibold mb-1">התראות</h2>
+          <p className="text-xs text-muted-foreground mb-3">
+            הגדרת התראות כלליות לסביבת העבודה.
+          </p>
+          <NotificationToggle
+            initialValue={ws?.notifyOnAnalysisDone ?? false}
+            isGoogleConnected={!!user?.googleEmail}
           />
         </div>
 

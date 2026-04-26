@@ -36,7 +36,6 @@ export const processConversationSchema = z.object({
     .string()
     .max(3000, "Instructions too long (max 3000 characters)")
     .optional(),
-  sendNotification: z.boolean().optional(),
 });
 
 export const sendEmailSchema = z.object({
