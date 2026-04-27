@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { AudioRecorder } from "@/components/conversations/audio-recorder";
 import { FileUpload } from "@/components/conversations/file-upload";
@@ -38,7 +37,6 @@ function uploadWithProgress(
 }
 
 export default function NewConversationPage() {
-  const router = useRouter();
   const labels = useLabels();
   const [mode, setMode] = useState<InputMode>("choose");
   const [title, setTitle] = useState("");
@@ -137,8 +135,12 @@ export default function NewConversationPage() {
         setError(msg);
       }
 
-      router.push(`/dashboard/conversations/${conversation.id}`);
-      router.refresh();
+      // Force a full page navigation rather than client-side router.push +
+      // router.refresh(). The latter races against Next.js's RSC cache and
+      // sometimes lands the user on the conversation page with the stale
+      // "UPLOADED" status, which makes the auto-analyze look like it didn't
+      // run. window.location bypasses every client-side cache layer.
+      window.location.href = `/dashboard/conversations/${conversation.id}`;
     } catch {
       setError(labels.somethingWentWrong);
       setUploading(false);
