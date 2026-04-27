@@ -224,13 +224,19 @@ export function AudioRecorder({
           </div>
 
           {recorder.isVideo ? (
-            <video
-              controls
-              src={recorder.mediaUrl}
+            <RecordedMediaPlayer
+              kind="video"
+              src={recorder.mediaUrl ?? ""}
+              fallbackDurationSec={recorder.elapsed}
               className="w-full rounded-lg bg-black max-h-80"
             />
           ) : (
-            <audio controls src={recorder.mediaUrl} className="w-full" />
+            <RecordedMediaPlayer
+              kind="audio"
+              src={recorder.mediaUrl ?? ""}
+              fallbackDurationSec={recorder.elapsed}
+              className="w-full"
+            />
           )}
 
           <div className="flex items-center gap-2 flex-wrap">
@@ -399,6 +405,81 @@ function MicPermissionGuide({
         {labels.micDeniedRetry ?? 'נסה שוב — אישרתי גישה למיקרופון'}
       </button>
     </div>
+  );
+}
+
+// ============================================================================
+// Recorded media player — works around the WebM/Opus duration bug
+//
+// MediaRecorder produces blobs without a duration in the EBML header, so the
+// browser's <audio>/<video> element shows duration as Infinity (or a wrong
+// value, "0:12" for a 13-second clip). Trick: on `loadedmetadata`, seek to
+// a very large time — that forces the browser to scan the file, fire
+// `durationchange` with the real value, then we seek back to 0.
+//
+// Falls back to the recorder's elapsed counter as a UI hint until the real
+// duration is known, so the user never sees "Infinity" or "NaN:NaN".
+// ============================================================================
+
+function RecordedMediaPlayer({
+  kind,
+  src,
+  fallbackDurationSec,
+  className,
+}: {
+  kind: "audio" | "video";
+  src: string;
+  fallbackDurationSec: number;
+  className?: string;
+}) {
+  const ref = useRef<HTMLMediaElement | null>(null);
+  const fixedRef = useRef(false);
+
+  useEffect(() => {
+    fixedRef.current = false;
+  }, [src]);
+
+  function handleLoadedMetadata() {
+    const el = ref.current;
+    if (!el || fixedRef.current) return;
+    if (Number.isFinite(el.duration) && el.duration > 0) return;
+    fixedRef.current = true;
+    const onDurationChange = () => {
+      if (Number.isFinite(el.duration) && el.duration > 0) {
+        el.removeEventListener("durationchange", onDurationChange);
+        el.currentTime = 0;
+      }
+    };
+    el.addEventListener("durationchange", onDurationChange);
+    // Big seek to force the browser to scan the entire file.
+    try {
+      el.currentTime = Number.MAX_SAFE_INTEGER;
+    } catch {
+      // some browsers throw on huge values — fall back to a large finite seek.
+      el.currentTime = 1e6;
+    }
+  }
+
+  // Common props for both audio and video elements.
+  const sharedProps = {
+    controls: true,
+    preload: "metadata" as const,
+    src: src || undefined,
+    onLoadedMetadata: handleLoadedMetadata,
+    className,
+    "aria-label": `recorded ${kind}, approx ${fallbackDurationSec}s`,
+  };
+
+  return kind === "video" ? (
+    <video
+      ref={ref as React.MutableRefObject<HTMLVideoElement | null>}
+      {...sharedProps}
+    />
+  ) : (
+    <audio
+      ref={ref as React.MutableRefObject<HTMLAudioElement | null>}
+      {...sharedProps}
+    />
   );
 }
 
