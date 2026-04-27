@@ -90,7 +90,24 @@ export function AudioRecorder({
       {isDenied && (
         <MicPermissionGuide
           labels={labels}
-          onRetry={() => { recorder.reset(); recorder.start("mic"); }}
+          onRetry={async () => {
+            // Re-query the live permission state — some browsers don't fire
+            // PermissionStatus.onchange reliably when the user flips the
+            // toggle through the lock-icon menu, leaving micDenied stuck
+            // at true even after the site is allowed again.
+            try {
+              if (typeof navigator !== "undefined" && navigator.permissions) {
+                const status = await navigator.permissions.query({
+                  name: "microphone" as PermissionName,
+                });
+                setMicDenied(status.state === "denied");
+              }
+            } catch {
+              // Permissions API not supported — fall back to attempting start.
+            }
+            recorder.reset();
+            recorder.start("mic");
+          }}
         />
       )}
 
