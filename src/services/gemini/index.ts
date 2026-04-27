@@ -25,8 +25,15 @@ function getClient(): GoogleGenAI {
 // Model fallback — tries models in order, switches immediately on 503
 // ============================================================================
 
+// Both models are configurable via env so a deploy can change them without
+// touching code. Defaults: primary = flash (fast + cheap), fallback = flash-lite
+// (cheaper, used when flash returns 503/UNAVAILABLE).
+//
+// To upgrade reliability over cost — set GEMINI_FALLBACK_MODEL=gemini-2.5-pro
+// in the production .env. When flash is overloaded, the analysis will retry on
+// pro instead of falling back to a smaller model.
 const PRIMARY_MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash";
-const FALLBACK_MODEL = "gemini-2.5-flash-lite";
+const FALLBACK_MODEL = process.env.GEMINI_FALLBACK_MODEL || "gemini-2.5-flash-lite";
 
 function isRetriableError(error: unknown): boolean {
   const raw = error instanceof Error ? error.message : String(error);
