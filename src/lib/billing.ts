@@ -1,12 +1,19 @@
 import { db } from "@/lib/db";
 
-// Free-tier fallback: used when no active subscription exists
+// Free-tier fallback: used when no active subscription exists.
+//
+// Soft-launch posture: limits are intentionally set very high so the
+// pre-billing audience never hits a quota wall while we're still
+// validating the product. The Stripe / Subscription / UsageRecord
+// infrastructure stays fully wired (routes, webhook, settings UI) — when
+// real billing is ready, lower these numbers to the real free tier and
+// no other code change is required.
 const FREE_LIMITS = {
-  maxConversationsPerMonth: 10,
-  maxAudioMinutesPerMonth: 120,
-  maxAiQueriesPerMonth: 50,
-  maxStorageMb: 500,
-  maxMembersPerWorkspace: 3,
+  maxConversationsPerMonth: 100000,
+  maxAudioMinutesPerMonth: 1000000,
+  maxAiQueriesPerMonth: 100000,
+  maxStorageMb: 100000,
+  maxMembersPerWorkspace: 100,
 };
 
 function periodStart(): Date {
