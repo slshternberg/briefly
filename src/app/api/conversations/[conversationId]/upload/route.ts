@@ -102,10 +102,26 @@ export async function POST(
 
     // Extract duration with a tight timeout — failure never blocks the upload.
     // The /process route will retry if this returns null.
-    const durationSeconds = await extractDurationSeconds(
+    let durationSeconds = await extractDurationSeconds(
       { buffer, mimeType },
       2000
     );
+
+    // Fallback: MediaRecorder's WebM/Opus blobs lack a duration in the EBML
+    // header, so music-metadata returns null even though the recording is
+    // valid. The recorder counts elapsed seconds while it runs and posts
+    // them as `clientDurationSeconds`. Only used when server extraction
+    // fails. Capped at 24h to defend against a malicious or buggy client
+    // gaming the audio-minutes billing counter.
+    if (durationSeconds == null) {
+      const clientDurationRaw = formData.get("clientDurationSeconds");
+      if (typeof clientDurationRaw === "string") {
+        const parsed = Number(clientDurationRaw);
+        if (Number.isFinite(parsed) && parsed > 0 && parsed <= 86_400) {
+          durationSeconds = Math.round(parsed);
+        }
+      }
+    }
 
     const asset = await uploadAudioAsset({
       workspaceId,

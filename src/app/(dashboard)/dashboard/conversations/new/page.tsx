@@ -41,6 +41,11 @@ export default function NewConversationPage() {
   const [mode, setMode] = useState<InputMode>("choose");
   const [title, setTitle] = useState("");
   const [audioFile, setAudioFile] = useState<File | null>(null);
+  // Duration the recorder measured while it was running (or null for
+  // file-upload mode, where the server extracts duration from metadata).
+  // Used as a server-side fallback when music-metadata can't read the
+  // duration from a WebM/Opus blob produced by MediaRecorder.
+  const [recordedDurationSeconds, setRecordedDurationSeconds] = useState<number | null>(null);
   const [sourceType, setSourceType] = useState<"RECORDED" | "UPLOADED">("UPLOADED");
   const [compress, setCompress] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -96,6 +101,12 @@ export default function NewConversationPage() {
       const formData = new FormData();
       formData.append("file", fileToUpload);
       formData.append("sourceType", sourceType);
+      // Send the recorder's elapsed counter so the server has a fallback
+      // duration when music-metadata can't extract it from a WebM/Opus blob.
+      // For file-upload mode this stays null and the server extracts as before.
+      if (recordedDurationSeconds !== null) {
+        formData.append("clientDurationSeconds", String(recordedDurationSeconds));
+      }
 
       setPhase("uploading");
 
@@ -226,12 +237,15 @@ export default function NewConversationPage() {
         {mode === "record" && (
           <div>
             <AudioRecorder
-              onRecordingComplete={(file) => setAudioFile(file)}
+              onRecordingComplete={(file, durationSec) => {
+                setAudioFile(file);
+                setRecordedDurationSeconds(durationSec);
+              }}
               disabled={uploading}
             />
             <button
               type="button"
-              onClick={() => { setMode("choose"); setAudioFile(null); }}
+              onClick={() => { setMode("choose"); setAudioFile(null); setRecordedDurationSeconds(null); }}
               className="mt-2 text-sm text-muted-foreground hover:text-foreground transition"
             >
               {labels.chooseDifferentMethod}
@@ -247,7 +261,7 @@ export default function NewConversationPage() {
             />
             <button
               type="button"
-              onClick={() => { setMode("choose"); setAudioFile(null); }}
+              onClick={() => { setMode("choose"); setAudioFile(null); setRecordedDurationSeconds(null); }}
               className="mt-2 text-sm text-muted-foreground hover:text-foreground transition"
             >
               {labels.chooseDifferentMethod}

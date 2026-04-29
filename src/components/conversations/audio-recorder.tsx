@@ -7,7 +7,12 @@ import { useLabels } from "@/lib/client-language";
 import { convertBlobToMp3, downloadFile } from "@/lib/mp3-encoder";
 
 interface AudioRecorderProps {
-  onRecordingComplete: (file: File) => void;
+  // Duration is the elapsed seconds the recorder counted while recording.
+  // It's needed because MediaRecorder produces WebM/Opus blobs without a
+  // duration in the EBML header, and music-metadata cannot extract it
+  // server-side. The client value is the only reliable source for these
+  // recordings — the upload route uses it as a fallback when extraction fails.
+  onRecordingComplete: (file: File, durationSeconds: number) => void;
   disabled?: boolean;
   maxMinutes?: number;
 }
@@ -53,10 +58,12 @@ export function AudioRecorder({
     };
   }, []);
 
-  // Notify parent exactly once when recording is complete
+  // Notify parent exactly once when recording is complete. Pass the elapsed
+  // counter as the authoritative duration — see comment on
+  // AudioRecorderProps.onRecordingComplete for why.
   useEffect(() => {
     if (recorder.state === "recorded" && recorder.recordedFile) {
-      onRecordingComplete(recorder.recordedFile);
+      onRecordingComplete(recorder.recordedFile, recorder.elapsed);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [recorder.state]);

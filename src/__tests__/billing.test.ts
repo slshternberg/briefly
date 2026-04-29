@@ -53,9 +53,12 @@ describe("checkConversationLimit", () => {
   });
 
   it("returns error when at free limit", async () => {
-    mockDb.usageRecord.findFirst.mockResolvedValue({ conversationCount: 10 });
+    // Soft-launch posture (commit d985a8a) bumped FREE_LIMITS.maxConversations
+    // from 10 to 100,000. Test moved to match the live cap; lower it again
+    // when real billing is turned on.
+    mockDb.usageRecord.findFirst.mockResolvedValue({ conversationCount: 100_000 });
     const result = await checkConversationLimit("ws1");
-    expect(result).toContain("10");
+    expect(result).toContain("100000");
   });
 
   it("returns null when under pro limit", async () => {
@@ -84,22 +87,22 @@ describe("checkAudioMinutesLimit", () => {
   });
 
   it("returns error when new upload exceeds limit", async () => {
-    // 100 min used, adding 30 min → 130 min > 120 min free limit
-    mockDb.usageRecord.findFirst.mockResolvedValue({ audioSecondsUsed: 100 * 60 });
-    const result = await checkAudioMinutesLimit("ws1", 30 * 60);
+    // Free cap was bumped to 1,000,000 minutes (commit d985a8a) for the
+    // soft-launch period. Test the cap instead of the legacy 120-minute one.
+    mockDb.usageRecord.findFirst.mockResolvedValue({ audioSecondsUsed: 999_999 * 60 });
+    const result = await checkAudioMinutesLimit("ws1", 2 * 60);
     expect(result).not.toBeNull();
-    expect(result).toContain("120");
+    expect(result).toContain("1000000");
   });
 
   it("returns null exactly at limit boundary (not over)", async () => {
-    // 60 min used, adding 60 min → exactly 120 min (not over)
-    mockDb.usageRecord.findFirst.mockResolvedValue({ audioSecondsUsed: 60 * 60 });
-    expect(await checkAudioMinutesLimit("ws1", 60 * 60)).toBeNull();
+    // Used + new = exactly cap → not over.
+    mockDb.usageRecord.findFirst.mockResolvedValue({ audioSecondsUsed: 999_999 * 60 });
+    expect(await checkAudioMinutesLimit("ws1", 60)).toBeNull();
   });
 
   it("returns error one second over limit", async () => {
-    // 120 min used exactly, adding 1 second → over
-    mockDb.usageRecord.findFirst.mockResolvedValue({ audioSecondsUsed: 120 * 60 });
+    mockDb.usageRecord.findFirst.mockResolvedValue({ audioSecondsUsed: 1_000_000 * 60 });
     const result = await checkAudioMinutesLimit("ws1", 1);
     expect(result).not.toBeNull();
   });
@@ -124,9 +127,10 @@ describe("checkAiQueryLimit", () => {
   });
 
   it("returns error when at limit", async () => {
-    mockDb.usageRecord.findFirst.mockResolvedValue({ aiQueryCount: 50 });
+    // Free cap bumped to 100,000 (commit d985a8a — soft-launch).
+    mockDb.usageRecord.findFirst.mockResolvedValue({ aiQueryCount: 100_000 });
     const result = await checkAiQueryLimit("ws1");
-    expect(result).toContain("50");
+    expect(result).toContain("100000");
   });
 
   it("returns null with no usage", async () => {
@@ -141,9 +145,10 @@ describe("checkMembersLimit", () => {
   });
 
   it("returns error when at free limit", async () => {
-    mockDb.workspaceMember.count.mockResolvedValue(3);
+    // Soft-launch cap is 100 members (commit d985a8a).
+    mockDb.workspaceMember.count.mockResolvedValue(100);
     const result = await checkMembersLimit("ws1");
-    expect(result).toContain("3");
+    expect(result).toContain("100");
   });
 
   it("respects pro plan member limit", async () => {
