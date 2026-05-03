@@ -31,6 +31,20 @@ export interface UseRecorderReturn {
   reset: () => void;
 }
 
+const displayMediaOptions = {
+  video: { frameRate: 30 },
+  audio: {
+    autoGainControl: false,
+    echoCancellation: false,
+    noiseSuppression: false,
+    suppressLocalAudioPlayback: false,
+  },
+  selfBrowserSurface: "exclude",
+  surfaceSwitching: "include",
+  systemAudio: "include",
+  windowAudio: "system",
+} as DisplayMediaStreamOptions;
+
 export function useRecorder(maxSeconds = 7200): UseRecorderReturn {
   const [state, setState] = useState<RecorderState>("idle");
   const [source, setSource] = useState<RecorderSource>("mic");
@@ -96,16 +110,8 @@ export function useRecorder(maxSeconds = 7200): UseRecorderReturn {
     }
 
     if (src === "screen") {
-      // getDisplayMedia with audio → captures tab/system audio (Chrome/Edge)
-      const stream = await navigator.mediaDevices.getDisplayMedia({
-        video: { frameRate: 30 },
-        audio: {
-          // Disable processing so meeting audio isn't distorted
-          autoGainControl: false,
-          echoCancellation: false,
-          noiseSuppression: false,
-        },
-      });
+      // getDisplayMedia with audio captures tab/system audio in Chrome/Edge.
+      const stream = await navigator.mediaDevices.getDisplayMedia(displayMediaOptions);
 
       if (stream.getAudioTracks().length === 0) {
         // User forgot to check "Share tab audio" — stop video and throw
@@ -116,14 +122,7 @@ export function useRecorder(maxSeconds = 7200): UseRecorderReturn {
     }
 
     // "both" — mix mic + system audio into a single output stream
-    const displayStream = await navigator.mediaDevices.getDisplayMedia({
-      video: { frameRate: 30 },
-      audio: {
-        autoGainControl: false,
-        echoCancellation: false,
-        noiseSuppression: false,
-      },
-    });
+    const displayStream = await navigator.mediaDevices.getDisplayMedia(displayMediaOptions);
 
     if (displayStream.getAudioTracks().length === 0) {
       displayStream.getTracks().forEach((t) => t.stop());

@@ -449,15 +449,15 @@ const LABELS: Record<string, UILabels> = {
     sourceMicTitle: "מיקרופון בלבד",
     sourceMicDesc: "הקלטת הקול שלך בלבד (לתזכיר אישי וכו׳)",
     sourceScreenTitle: "פגישה על המחשב",
-    sourceScreenDesc: "שתף טאב/חלון של Zoom, Meet או Teams — נקלט כולל אודיו של כל המשתתפים",
+    sourceScreenDesc: "שתף טאב פגישה או מסך שלם ב-Zoom, Meet או Teams",
     sourceBothTitle: "פגישה + המיקרופון שלך",
     sourceBothDesc: "אודיו מערכת + הקול שלך יחד — הכי טוב להקלטת פגישות שאתה משתתף בהן",
-    screenAudioHint: "לפגישות: סמן “שתף אודיו מהטאב” בדיאלוג של הדפדפן. זמין ב-Chrome / Edge.",
+    screenAudioHint: "Zoom בדפדפן: בחר טאב וסמן “שתף אודיו מהטאב”. Zoom באפליקציה: בחר “מסך שלם” וסמן “שתף אודיו מערכת”, אם הדפדפן מציג את האפשרות.",
     requestingScreen: "מבקש גישה למסך...",
     recordingScreen: "מקליט פגישה",
     recordingBoth: "מקליט פגישה + מיקרופון",
     screenDenied: "גישת שיתוף מסך נדחתה או בוטלה.",
-    noSystemAudio: 'לא נמצא אודיו. סמן “שתף אודיו מהטאב” בדיאלוג השיתוף ונסה שוב.',
+    noSystemAudio: 'לא נמצא אודיו מהפגישה. אם זו אפליקציית Zoom, בחר “מסך שלם” וסמן “שתף אודיו מערכת”; אם האפשרות לא מופיעה, פתח את Zoom בדפדפן ובחר טאב עם “שתף אודיו מהטאב”.',
 
     // Mic permission denied guide
     micDeniedTitle: 'הגישה למיקרופון חסומה',
@@ -471,13 +471,13 @@ const LABELS: Record<string, UILabels> = {
     // Meet guide
     meetGuideTitleBoth: 'איך להקליט פגישה + המיקרופון שלך',
     meetGuideTitleScreen: 'איך להקליט פגישה',
-    meetStep1: 'היכנסי לפגישה (Meet, Zoom, Teams וכו\') בטאב נפרד',
+    meetStep1: 'היכנסי לפגישה בטאב בדפדפן, או פתחי את אפליקציית Zoom כשהחלון גלוי על המסך',
     meetStep2: 'לחצי “התחל” — יפתח דיאלוג שיתוף מסך',
-    meetStep3: 'בחרי “טאב” (Tab) ובחרי את טאב הפגישה',
-    meetStep4: '\u2705 סמני “שתף אודיו מהטאב” — חובה!',
+    meetStep3: 'לפגישה בדפדפן: בחרי “טאב” ואת טאב הפגישה. ל-Zoom באפליקציה: בחרי “מסך שלם”',
+    meetStep4: '\u2705 סמני “שתף אודיו מהטאב” או “שתף אודיו מערכת” — חובה!',
     meetStep5: 'לחצי “שתף”, ואז אפשרי גישה למיקרופון',
     meetStep5Screen: 'לחצי “שתף”',
-    meetAudioWarning: '\u26a0\ufe0f Chrome / Edge בלבד — Safari לא תומך. אם אין אופציית “שתף אודיו”, בחרי “טאב” ולא “חלון”.',
+    meetAudioWarning: '\u26a0\ufe0f Chrome / Edge בלבד. חלון Zoom רגיל לא תמיד נותן אודיו לדפדפן; אם אין “שתף אודיו”, השתמשי בטאב Zoom בדפדפן או במסך שלם עם שיתוף אודיו מערכת.',
     meetStartBtn: 'הבנתי — התחל שיתוף מסך',
 
     // MP3 export
@@ -699,15 +699,15 @@ const LABELS: Record<string, UILabels> = {
     sourceMicTitle: "Microphone only",
     sourceMicDesc: "Record just your voice (memos, notes, etc.)",
     sourceScreenTitle: "Live meeting on this computer",
-    sourceScreenDesc: "Share a Zoom, Meet, or Teams tab/window — captures all participants",
+    sourceScreenDesc: "Share a meeting tab or full screen for Zoom, Meet, or Teams",
     sourceBothTitle: "Meeting + your microphone",
     sourceBothDesc: "System audio mixed with your mic — best for meetings you're actively in",
-    screenAudioHint: "Meetings: in the share dialog, tick \"Share tab audio\". Works in Chrome / Edge.",
+    screenAudioHint: "Browser Zoom: choose the tab and tick \"Share tab audio\". Zoom app: choose \"Entire screen\" and tick system audio if Chrome/Edge shows it.",
     requestingScreen: "Requesting screen access...",
     recordingScreen: "Recording meeting",
     recordingBoth: "Recording meeting + mic",
     screenDenied: "Screen share was denied or cancelled.",
-    noSystemAudio: "No audio captured. Tick \"Share tab audio\" in the share dialog and try again.",
+    noSystemAudio: "No meeting audio was captured. For the Zoom app, choose \"Entire screen\" and tick system audio; if that option is missing, open Zoom in the browser and choose its tab with \"Share tab audio\".",
 
     // Mic permission denied guide
     micDeniedTitle: 'Microphone access is blocked',
@@ -721,13 +721,13 @@ const LABELS: Record<string, UILabels> = {
     // Meet guide
     meetGuideTitleBoth: 'How to record a meeting + your microphone',
     meetGuideTitleScreen: 'How to record a meeting',
-    meetStep1: 'Join your meeting (Meet, Zoom, Teams, etc.) in a separate tab',
+    meetStep1: 'Join the meeting in a browser tab, or keep the Zoom app window visible on screen',
     meetStep2: 'Click "Start" \u2014 a screen share dialog will open',
-    meetStep3: 'Choose "Tab" and select your meeting tab',
-    meetStep4: '\u2705 Check "Share tab audio" \u2014 this is required!',
+    meetStep3: 'Browser meeting: choose "Tab". Zoom app: choose "Entire screen"',
+    meetStep4: '\u2705 Check "Share tab audio" or system audio \u2014 this is required!',
     meetStep5: 'Click "Share", then allow microphone access',
     meetStep5Screen: 'Click "Share"',
-    meetAudioWarning: '\u26a0\ufe0f Chrome / Edge only \u2014 Safari doesn\'t support tab audio. If "Share audio" is missing, select "Tab" not "Window".',
+    meetAudioWarning: '\u26a0\ufe0f Chrome / Edge only. A regular Zoom app window may not expose audio to the browser; if audio sharing is missing, use Zoom in a browser tab or full-screen sharing with system audio.',
     meetStartBtn: 'Got it \u2014 start screen share',
 
     // MP3 export
