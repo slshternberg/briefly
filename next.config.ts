@@ -7,7 +7,8 @@ import type { NextConfig } from "next";
 //   has been stable for months.
 // - Permissions-Policy explicitly allows `microphone` and `display-capture`
 //   for self (audio + screen recording in src/hooks/use-recorder.ts) and
-//   shuts everything else off.
+//   allows `camera` for self because Chromium enforces that policy for
+//   display-media video capture too.
 // - CSP is held for a follow-up pass (tracked in TODO-observed.md). Next.js
 //   emits inline styles and scripts that require either `unsafe-inline` or
 //   per-request nonces; rolling out without browser verification risks
@@ -21,7 +22,7 @@ const BASE_SECURITY_HEADERS = [
     value: [
       "microphone=(self)",
       "display-capture=(self)",
-      "camera=()",
+      "camera=(self)",
       "geolocation=()",
       "payment=()",
       "usb=()",
