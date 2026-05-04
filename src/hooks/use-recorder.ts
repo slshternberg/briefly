@@ -118,7 +118,21 @@ export function useRecorder(maxSeconds = 7200): UseRecorderReturn {
         stream.getTracks().forEach((t) => t.stop());
         throw new Error("no_system_audio");
       }
-      return { stream, hasVideo: true, visualisationStream: stream };
+
+      // The browser requires a screen/video selection to grant system audio,
+      // but Briefly only needs the meeting audio. Keep the original display
+      // stream alive for permissions/cleanup, and record only its audio track.
+      stream.getVideoTracks().forEach((track) => {
+        track.onended = () => stop();
+      });
+      tracksRef.current.push(...stream.getTracks());
+
+      const audioOnlyStream = new MediaStream(stream.getAudioTracks());
+      return {
+        stream: audioOnlyStream,
+        hasVideo: false,
+        visualisationStream: audioOnlyStream,
+      };
     }
 
     // "both" — mix mic + system audio into a single output stream
