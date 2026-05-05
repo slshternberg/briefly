@@ -63,6 +63,9 @@ vi.mock("@/lib/db", () => ({
 }));
 vi.mock("@/lib/auth", () => ({ auth: mockAuth }));
 vi.mock("@/lib/audit", () => ({ logAudit: mockLogAudit }));
+vi.mock("@/lib/env", () => ({
+  env: { AUTH_URL: "https://briefly.example.com" },
+}));
 
 beforeEach(() => {
   vi.clearAllMocks();
