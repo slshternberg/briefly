@@ -213,10 +213,10 @@ export async function POST(
 <html dir="rtl" lang="he">
 <body style="direction:rtl;text-align:right;font-family:Arial,sans-serif;font-size:14px;line-height:1.6;color:#222;max-width:700px;margin:0 auto;padding:16px;">
 ${escapedBody}
-<div style="margin-top:28px;padding-top:16px;border-top:1px solid #e5e7eb;color:#6b7280;font-size:12px;line-height:1.5;">
-  <span style="vertical-align:middle;">המערכת נבנתה על ידי </span>
-  <a href="${BIZFLY_URL}" style="display:inline-block;vertical-align:middle;text-decoration:none;" target="_blank" rel="noopener noreferrer">
-    <img src="${BIZFLY_LOGO_URL}" alt="BIZFLY" width="72" style="display:inline-block;vertical-align:middle;border:0;max-width:72px;height:auto;margin-inline-start:6px;" />
+<div style="margin-top:32px;background:#050505;border-radius:10px;padding:18px 20px;text-align:center;color:#ffffff;font-size:16px;line-height:1.5;">
+  <span style="vertical-align:middle;font-weight:600;">המערכת נבנתה על ידי</span>
+  <a href="${BIZFLY_URL}" style="display:inline-block;vertical-align:middle;text-decoration:none;margin-inline-start:10px;" target="_blank" rel="noopener noreferrer">
+    <img src="${BIZFLY_LOGO_URL}" alt="BIZFLY" width="112" style="display:inline-block;vertical-align:middle;border:0;max-width:112px;height:auto;" />
   </a>
 </div>
 </body>
