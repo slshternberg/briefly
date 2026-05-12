@@ -14,6 +14,7 @@ import type { ConversationAnalysis } from "@/services/gemini/schema";
 import { db } from "@/lib/db";
 import { getLabels, isRTL } from "@/lib/ui-labels";
 import { calculateGeminiCost } from "@/services/gmail";
+import { Download } from "lucide-react";
 
 const STATUS_COLORS: Record<string, string> = {
   DRAFT: "bg-muted text-muted-foreground",
@@ -145,7 +146,17 @@ export default async function ConversationDetailPage({
       {/* Audio section */}
       {asset && (
         <div className="rounded-xl border border-border bg-card/60 p-5 mb-6">
-          <h2 className="font-semibold mb-3">{labels.audio}</h2>
+          <div className="flex items-center justify-between gap-3 mb-3">
+            <h2 className="font-semibold">{labels.audio}</h2>
+            <a
+              href={`/api/conversations/${conversation.id}/audio?download=1`}
+              download={asset.originalName}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-background px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground"
+            >
+              <Download className="size-3.5" />
+              {rtl ? "הורד הקלטה" : "Download recording"}
+            </a>
+          </div>
           <div className="text-sm text-muted-foreground mb-3 flex flex-wrap gap-x-4 gap-y-1">
             <span>
               {asset.sourceType === "RECORDED" ? labels.recorded : labels.uploaded}

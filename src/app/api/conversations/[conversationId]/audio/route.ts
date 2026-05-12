@@ -33,10 +33,15 @@ export async function GET(
     const storage = getStorageProvider();
     const buffer = await storage.getFileBuffer(asset.storagePath);
     const totalSize = buffer.length;
+    const shouldDownload = new URL(req.url).searchParams.get("download") === "1";
+    const encodedName = encodeURIComponent(asset.originalName || "recording")
+      .replace(/['()]/g, escape)
+      .replace(/\*/g, "%2A");
+    const disposition = `attachment; filename="recording"; filename*=UTF-8''${encodedName}`;
 
     const rangeHeader = req.headers.get("range");
 
-    if (rangeHeader) {
+    if (rangeHeader && !shouldDownload) {
       const match = rangeHeader.match(/bytes=(\d+)-(\d*)/);
       if (match) {
         const start = parseInt(match[1], 10);
@@ -58,10 +63,11 @@ export async function GET(
 
     return new Response(new Uint8Array(buffer), {
       headers: {
-        "Content-Type": asset.mimeType,
+        "Content-Type": shouldDownload ? "application/octet-stream" : asset.mimeType,
         "Content-Length": totalSize.toString(),
         "Accept-Ranges": "bytes",
         "Cache-Control": "private, max-age=3600",
+        ...(shouldDownload ? { "Content-Disposition": disposition } : {}),
       },
     });
   } catch (error) {

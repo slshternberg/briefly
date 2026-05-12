@@ -22,9 +22,18 @@ const MAX_ATTACHMENT_RAW_BYTES = 18 * 1024 * 1024;
 // dropping syllables. 64 kbps is plenty for short clips.
 const MIN_BITRATE_KBPS = 16;
 const MAX_BITRATE_KBPS = 64;
+const BIZFLY_URL = "https://bizfly.co.il/";
+const BIZFLY_LOGO_URL = "https://briefly.bizfly.co.il/images/logo%20bizfly.png";
 
 function encodeSubject(subject: string) {
   return `=?UTF-8?B?${Buffer.from(subject, "utf-8").toString("base64")}?=`;
+}
+
+function escapeHtml(value: string) {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
 }
 
 /**
@@ -195,16 +204,21 @@ export async function POST(
   });
 
   // Convert markdown-like text to HTML with RTL support
+  const escapedBody = escapeHtml(body)
+    .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
+    .replace(/\*(.*?)\*/g, "<em>$1</em>")
+    .replace(/\n/g, "<br>");
+
   const bodyHtml = `<!DOCTYPE html>
 <html dir="rtl" lang="he">
 <body style="direction:rtl;text-align:right;font-family:Arial,sans-serif;font-size:14px;line-height:1.6;color:#222;max-width:700px;margin:0 auto;padding:16px;">
-${body
-  .replace(/&/g, "&amp;")
-  .replace(/</g, "&lt;")
-  .replace(/>/g, "&gt;")
-  .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
-  .replace(/\*(.*?)\*/g, "<em>$1</em>")
-  .replace(/\n/g, "<br>")}
+${escapedBody}
+<div style="margin-top:28px;padding-top:16px;border-top:1px solid #e5e7eb;color:#6b7280;font-size:12px;line-height:1.5;">
+  <span style="vertical-align:middle;">המערכת נבנתה על ידי </span>
+  <a href="${BIZFLY_URL}" style="display:inline-block;vertical-align:middle;text-decoration:none;" target="_blank" rel="noopener noreferrer">
+    <img src="${BIZFLY_LOGO_URL}" alt="BIZFLY" width="72" style="display:inline-block;vertical-align:middle;border:0;max-width:72px;height:auto;margin-inline-start:6px;" />
+  </a>
+</div>
 </body>
 </html>`;
 
