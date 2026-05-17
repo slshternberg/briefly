@@ -49,11 +49,15 @@ ANALYSIS GUIDELINES (apply ONLY when contentType is "meeting_analysis"):
 
   if (styleProfile) {
     parts.push(`STYLE PROFILE (learned from the user's past communication patterns):
+
+GENERAL PREFERENCES — apply to ALL output fields:
 - Summary length preference: ${styleProfile.analysisPreferences.summaryLength}
 - Emphasize action items: ${styleProfile.analysisPreferences.emphasizeActionItems}
 - Emphasize objections: ${styleProfile.analysisPreferences.emphasizeObjections}
 - Preferred tone: ${styleProfile.analysisPreferences.tone}
 - Focus areas: ${styleProfile.analysisPreferences.focusAreas.join(", ") || "none specified"}
+
+EMAIL-ONLY PREFERENCES — apply STRICTLY to the suggestedEmailBody field, and to NO other field:
 - Email formality: ${styleProfile.emailStyleProfile.formality}
 - Email length: ${styleProfile.emailStyleProfile.length}
 - Email structure: ${styleProfile.emailStyleProfile.structure}
@@ -61,9 +65,10 @@ ANALYSIS GUIDELINES (apply ONLY when contentType is "meeting_analysis"):
 - Email closing style: ${styleProfile.emailStyleProfile.closingStyle}
 - Email directness: ${styleProfile.emailStyleProfile.directness}
 - Signature style: ${styleProfile.emailStyleProfile.signatureStyle}
-- Characteristic phrases to incorporate: ${styleProfile.emailStyleProfile.samplePhrases.join("; ") || "none"}
+- Characteristic phrases (signatures, taglines, sign-offs): ${styleProfile.emailStyleProfile.samplePhrases.join("; ") || "none"}
 
-Apply these style preferences to the output — especially the suggested follow-up email. The style profile reflects the user's actual writing patterns, so match them naturally.`);
+HARD RULE — DO NOT VIOLATE:
+The user's signature, sign-off, personal tagline, marketing slogan, or any "characteristic phrase" listed above MUST NOT appear in any summary field — including but not limited to internalSummary, clientFacingSummary, customSummary, keyTopics, decisions, actionItems, customerObjections, followUpPromises, openQuestions, sensitiveInternalNotes, or suggestedEmailSubject. These belong ONLY in suggestedEmailBody if appropriate. Summary fields must contain ONLY factual content from the conversation itself — never the user's personal branding language.`);
   }
 
   if (userInstructions) {

@@ -98,11 +98,17 @@ Analyze the RELATIONSHIP between this conversation and the email that followed. 
   "emailDirectness": "soft | balanced | direct",
   "openingStyle": "how the email opens (e.g. thanks_after_meeting, direct_recap)",
   "closingStyle": "how the email closes (e.g. warm_professional, action_oriented)",
-  "keyPhrases": ["characteristic phrases or patterns used"],
+  "keyPhrases": ["short stylistic linking phrases or transition patterns used in the body"],
   "meetingFocusAreas": ["what aspects of the meeting the email focused on"],
   "summaryStyle": "how the meeting content was summarized in the email",
-  "signatureStyle": "how the email is signed off"
+  "signatureStyle": "DESCRIPTION ONLY of how the email is signed off (e.g. 'first name + business tagline', 'name + title + phone'). DO NOT include the literal text of the signature, slogan, or tagline."
 }
+
+CRITICAL RULES for keyPhrases:
+- keyPhrases must contain ONLY short body-level stylistic patterns (e.g. transition words, recurring connectors, framing phrases used inside the body).
+- DO NOT include the user's personal signature, sign-off line, marketing tagline, business slogan, value proposition, call-to-action, or any sentence that describes the user themselves or their services.
+- DO NOT include the closing line / final sentence of the email.
+- If unsure whether a phrase is body-style or branding/signature — EXCLUDE it.
 
 Return ONLY valid JSON. Base your analysis STRICTLY on the actual audio and email content.`,
               },
@@ -200,11 +206,17 @@ Based on ALL these examples, generate a MERGED style profile that captures the u
     "closingStyle": "consistent closing pattern",
     "structure": "paragraphs" | "bullets" | "mixed",
     "directness": "soft" | "balanced" | "direct",
-    "signatureStyle": "consistent sign-off style",
-    "samplePhrases": ["characteristic phrases the user tends to use"]
+    "signatureStyle": "DESCRIPTION ONLY of the consistent sign-off style (e.g. 'first name + business tagline'). DO NOT include literal signature/tagline text.",
+    "samplePhrases": ["short body-level stylistic phrases ONLY"]
   },
   "generalObservations": "Free-text summary of the user's overall communication style and preferences"
 }
+
+CRITICAL RULES for samplePhrases:
+- samplePhrases must contain ONLY short body-level stylistic patterns (transitions, connectors, framing phrases used inside the email body).
+- DO NOT include the user's personal signature, sign-off line, marketing tagline, business slogan, value proposition, call-to-action, or any sentence that describes the user themselves or their services.
+- DO NOT include the literal closing line of any example.
+- If unsure whether a phrase is body-style or branding/signature — EXCLUDE it.
 
 Return ONLY valid JSON. Identify CONSISTENT patterns across all examples — ignore one-off variations.`,
             },

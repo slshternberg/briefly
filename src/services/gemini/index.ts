@@ -252,15 +252,15 @@ export async function analyzeConversationAudio(
       fewShotBlock = `
 
 STYLE LEARNING — REAL EMAILS I WROTE AFTER BUSINESS CONVERSATIONS:
-Study these examples with extreme care. Every output you produce MUST match this writing style precisely.
-Mirror the vocabulary, sentence length, formality, paragraph structure, tone, opening line, closing line, and any recurring phrases.
+Study these examples to learn the user's writing style. Match the vocabulary register, sentence length, formality, paragraph structure, tone, and directness.
 
 ${exampleTexts}
 
 ---
 STYLE RULES:
 - Do NOT copy the content of these examples — only their writing style.
-- If the examples include a signature, reproduce it exactly.
+- Signatures, sign-offs, personal taglines, and marketing slogans from these examples MUST NOT be appended to the output UNLESS the user's custom instructions explicitly request an email, letter, or similar communication to a recipient. If the user asked for a summary, analysis, notes, bullet points, or any non-correspondence output — DO NOT add a signature or sign-off line.
+- Do NOT copy the literal closing line / final sentence of the examples. Match the closing TONE only.
 - The output must read as if the user wrote it themselves, not as a template.`;
     }
 
@@ -279,9 +279,12 @@ CONFIRMED STYLE PATTERNS (consistent across all past examples):
 - Opening pattern: ${sp.emailStyleProfile.openingStyle}
 - Closing pattern: ${sp.emailStyleProfile.closingStyle}
 - Directness level: ${sp.emailStyleProfile.directness}
+${sp.generalObservations ? `- General observations: ${sp.generalObservations}` : ""}
+
+SIGNATURE / TAGLINE HANDLING (only relevant if the user's custom instructions ask for an email or letter):
 - Signature style: ${sp.emailStyleProfile.signatureStyle}
-${sp.emailStyleProfile.samplePhrases.length > 0 ? `- Recurring phrases to incorporate naturally: ${sp.emailStyleProfile.samplePhrases.join("; ")}` : ""}
-${sp.generalObservations ? `- General observations: ${sp.generalObservations}` : ""}`;
+${sp.emailStyleProfile.samplePhrases.length > 0 ? `- The user's recurring sign-off / tagline phrases: ${sp.emailStyleProfile.samplePhrases.join("; ")}` : ""}
+- Use the items in this block ONLY when producing email/letter-style correspondence. For summaries, notes, analyses, or any non-correspondence output — IGNORE this block completely and do not append any of these phrases.`;
     }
 
     const customSystemInstruction = `You are a business assistant analyzing an audio recording of a business conversation.
